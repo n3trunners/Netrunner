@@ -1,0 +1,6 @@
+{
+  "name": "NetRunner",
+  "description": "NetRunner - Developer workspace and AI project orchestration platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
