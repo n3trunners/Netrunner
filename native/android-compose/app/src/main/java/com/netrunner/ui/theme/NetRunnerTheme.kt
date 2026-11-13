@@ -1,10 +1,91 @@
 package com.netrunner.ui.theme
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import com.netrunner.app.R
+
+@Immutable
+data class NetRunnerVisualTokens(
+    val isDark: Boolean,
+    val backgroundBase: Color,
+    val textTitle: Color,
+    val textSub: Color,
+    val textMuted: Color,
+    val divider: Color,
+    val cardBg: Color,
+    val cardBorder: Color,
+    val pillBg: Color,
+    val pillBorder: Color,
+    val pillText: Color,
+    val inputBg: Color,
+    val inputBorder: Color,
+    val dockBg: Color,
+    val dockBorder: Color,
+    val accentBar: Color,
+    val modalBg: Color,
+    val modalBorder: Color,
+)
+
+private val DarkTokens = NetRunnerVisualTokens(
+    isDark = true,
+    backgroundBase = Color(0xFF060709),
+    textTitle = Color(0xFFFFFFFF),
+    textSub = Color(0xFF9CA3AF),
+    textMuted = Color(0xFF6B7280),
+    divider = Color.White.copy(alpha = 0.15f),
+    cardBg = Color.White.copy(alpha = 0.035f),
+    cardBorder = Color.White.copy(alpha = 0.08f),
+    pillBg = Color.White.copy(alpha = 0.06f),
+    pillBorder = Color.White.copy(alpha = 0.15f),
+    pillText = Color(0xFFFFFFFF),
+    inputBg = Color.White.copy(alpha = 0.04f),
+    inputBorder = Color.White.copy(alpha = 0.10f),
+    dockBg = Color(0xD90E1014),
+    dockBorder = Color.White.copy(alpha = 0.12f),
+    accentBar = Color(0xFF52525B),
+    modalBg = Color(0xFF0D0F14),
+    modalBorder = Color.White.copy(alpha = 0.12f),
+)
+
+private val LightTokens = NetRunnerVisualTokens(
+    isDark = false,
+    backgroundBase = Color(0xFFF4F5F8),
+    textTitle = Color(0xFF090A0F),
+    textSub = Color(0xFF475569),
+    textMuted = Color(0xFF64748B),
+    divider = Color.Black.copy(alpha = 0.12f),
+    cardBg = Color.White.copy(alpha = 0.86f),
+    cardBorder = Color(0xFFE2E8F0),
+    pillBg = Color(0xFF090A0F),
+    pillBorder = Color(0xFF090A0F),
+    pillText = Color(0xFFFFFFFF),
+    inputBg = Color.White.copy(alpha = 0.95f),
+    inputBorder = Color(0xFFE2E8F0),
+    dockBg = Color(0xE6FFFFFF),
+    dockBorder = Color(0xFFE2E8F0),
+    accentBar = Color(0xFF94A3B8),
+    modalBg = Color(0xFFFFFFFF),
+    modalBorder = Color(0xFFE2E8F0),
+)
+
+val LocalNetRunnerTokens = staticCompositionLocalOf { DarkTokens }
 
 private val DarkPalette = darkColorScheme(
     primary = Color(0xFFFFFFFF),
@@ -35,8 +116,62 @@ fun NetRunnerTheme(
     darkTheme: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    MaterialTheme(
-        colorScheme = if (darkTheme) DarkPalette else LightPalette,
-        content = content,
-    )
+    val tokens = if (darkTheme) DarkTokens else LightTokens
+    CompositionLocalProvider(LocalNetRunnerTokens provides tokens) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) DarkPalette else LightPalette,
+            content = content,
+        )
+    }
+}
+
+@Composable
+fun NetRunnerWallpaperBox(
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val tokens = LocalNetRunnerTokens.current
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(tokens.backgroundBase),
+    ) {
+        if (tokens.isDark) {
+            Image(
+                painter = painterResource(id = R.drawable.bg_dark_wallpaper),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alignment = Alignment.TopCenter,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xFFF8FAFC),
+                                Color(0xFFEEF2F7),
+                            ),
+                        ),
+                    ),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xD9E2E8F0),
+                                Color.Transparent,
+                            ),
+                            center = Offset(0f, 0f),
+                            radius = 900f,
+                        ),
+                    ),
+            )
+        }
+        content()
+    }
 }
