@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Github, Loader2, AlertCircle } from 'lucide-react';
-import { 
-  auth, 
-  githubProvider, 
-  signInWithPopup, 
+import {
+  auth,
+  githubProvider,
+  signInWithPopup,
   getAdditionalUserInfo,
   GithubAuthProvider,
-  db 
+  db
 } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
+import firebaseConfig from '../../firebase-applet-config.json';
 import { GitHubUser, GitHubStats, GitHubRepo } from '../types';
 
 interface GitHubAuthModalProps {
@@ -30,6 +31,123 @@ export function GitHubAuthModal({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const finalizeGitHubProfile = async (
+    rawProfile: Record<string, any>,
+    accessToken?: string,
+    firebaseUid?: string
+  ) => {
+    const login = rawProfile.login || 'developer';
+    const userProfile: GitHubUser = {
+      login,
+      name: rawProfile.name || login,
+      avatar_url: rawProfile.avatar_url || `https://github.com/${login}.png`,
+      html_url: rawProfile.html_url || `https://github.com/${login}`,
+      bio: rawProfile.bio || 'NetRunner Developer',
+      company: rawProfile.company || undefined,
+      location: rawProfile.location || undefined,
+      blog: rawProfile.blog || undefined,
+      twitter_username: rawProfile.twitter_username || undefined,
+      public_repos: typeof rawProfile.public_repos === 'number' ? rawProfile.public_repos : 0,
+      public_gists: typeof rawProfile.public_gists === 'number' ? rawProfile.public_gists : 0,
+      followers: typeof rawProfile.followers === 'number' ? rawProfile.followers : 0,
+      following: typeof rawProfile.following === 'number' ? rawProfile.following : 0,
+      created_at: rawProfile.created_at || new Date().toISOString()
+    };
+
+    const headers: Record<string, string> = {
+      Accept: 'application/vnd.github.v3+json',
+    };
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+
+    let repos: any[] = [];
+    try {
+      const reposRes = await fetch(
+        `https://api.github.com/users/${encodeURIComponent(login)}/repos?sort=updated&per_page=30`,
+        { headers }
+      );
+      if (reposRes.ok) {
+        repos = await reposRes.json();
+      }
+    } catch (err) {
+      console.warn('Could not fetch user repos:', err);
+    }
+
+    const totalStars = Array.isArray(repos)
+      ? repos.reduce((acc, r) => acc + (r.stargazers_count || 0), 0)
+      : 0;
+    const totalForks = Array.isArray(repos)
+      ? repos.reduce((acc, r) => acc + (r.forks_count || 0), 0)
+      : 0;
+
+    const languagesCount: Record<string, number> = {};
+    if (Array.isArray(repos)) {
+      repos.forEach((r) => {
+        if (r.language) {
+          languagesCount[r.language] = (languagesCount[r.language] || 0) + 1;
+        }
+      });
+    }
+
+    const topLanguages = Object.entries(languagesCount)
+      .sort((a, b) => b[1] - a[1])
+      .map(([language, count]) => ({ language, count }));
+
+    const stats: GitHubStats = {
+      totalStars,
+      totalForks,
+      publicRepos: userProfile.public_repos || repos.length,
+      followers: userProfile.followers,
+      topLanguages
+    };
+
+    const formattedRepos: GitHubRepo[] = Array.isArray(repos)
+      ? repos.map((r) => ({
+          id: r.id,
+          name: r.name,
+          description: r.description,
+          html_url: r.html_url,
+          stars: r.stargazers_count,
+          forks: r.forks_count,
+          language: r.language,
+          updated_at: r.updated_at
+        }))
+      : [];
+
+    if (firebaseUid) {
+      try {
+        await setDoc(doc(db, 'users', firebaseUid), {
+          ...userProfile,
+          uid: firebaseUid,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (e) {
+        console.warn('Firestore user doc sync notice:', e);
+      }
+    }
+
+    onLoginSuccess(userProfile, stats, formattedRepos, accessToken);
+    onShowToast(`Signed in as @${login}! Live stats synchronized.`);
+    setIsLoading(false);
+    onClose();
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleMessage = (event: MessageEvent) => {
+      const origin = event.origin;
+      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
+        return;
+      }
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.user) {
+        finalizeGitHubProfile(event.data.user, event.data.token);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleContinueWithGitHub = async () => {
@@ -37,128 +155,46 @@ export function GitHubAuthModal({
     setErrorMessage(null);
 
     try {
-      // 1. Sign in with Firebase GitHub Provider
-      const result = await signInWithPopup(auth, githubProvider);
-      const fbUser = result.user;
+      const hasFirebaseAuth = Boolean(firebaseConfig?.apiKey);
+      if (hasFirebaseAuth) {
+        const result = await signInWithPopup(auth, githubProvider);
+        const fbUser = result.user;
+        const additionalInfo = getAdditionalUserInfo(result);
+        const credential = GithubAuthProvider.credentialFromResult(result);
+        const accessToken = credential?.accessToken;
+        const rawProfile: any = additionalInfo?.profile || {};
+        const login =
+          additionalInfo?.username ||
+          rawProfile.login ||
+          (fbUser.displayName ? fbUser.displayName.replace(/\s+/g, '') : 'developer');
 
-      // Extract real GitHub profile details directly from GitHub OAuth payload
-      const additionalInfo = getAdditionalUserInfo(result);
-      const credential = GithubAuthProvider.credentialFromResult(result);
-      const accessToken = credential?.accessToken;
-
-      const rawProfile: any = additionalInfo?.profile || {};
-      
-      // Exact GitHub username & avatar as configured in their GitHub account
-      const login = additionalInfo?.username || rawProfile.login || (fbUser.displayName ? fbUser.displayName.replace(/\s+/g, '') : 'developer');
-      const avatar_url = rawProfile.avatar_url || fbUser.photoURL || `https://github.com/${login}.png`;
-      const name = rawProfile.name || fbUser.displayName || login;
-      const bio = rawProfile.bio || 'NetRunner Developer';
-      const html_url = rawProfile.html_url || `https://github.com/${login}`;
-      const company = rawProfile.company || undefined;
-      const location = rawProfile.location || undefined;
-      const blog = rawProfile.blog || undefined;
-      const twitter_username = rawProfile.twitter_username || undefined;
-      const public_repos = typeof rawProfile.public_repos === 'number' ? rawProfile.public_repos : 0;
-      const public_gists = typeof rawProfile.public_gists === 'number' ? rawProfile.public_gists : 0;
-      const followers = typeof rawProfile.followers === 'number' ? rawProfile.followers : 0;
-      const following = typeof rawProfile.following === 'number' ? rawProfile.following : 0;
-
-      const userProfile: GitHubUser = {
-        login,
-        name,
-        avatar_url,
-        html_url,
-        bio,
-        company,
-        location,
-        blog,
-        twitter_username,
-        public_repos,
-        public_gists,
-        followers,
-        following,
-        created_at: rawProfile.created_at || new Date().toISOString()
-      };
-
-      // 2. Fetch real-time live repositories & metrics from GitHub API
-      const headers: Record<string, string> = {
-        Accept: 'application/vnd.github.v3+json',
-      };
-      if (accessToken) {
-        headers.Authorization = `Bearer ${accessToken}`;
-      }
-
-      let repos: any[] = [];
-      try {
-        const reposRes = await fetch(
-          `https://api.github.com/users/${encodeURIComponent(login)}/repos?sort=updated&per_page=30`,
-          { headers }
+        await finalizeGitHubProfile(
+          {
+            ...rawProfile,
+            login,
+            name: rawProfile.name || fbUser.displayName || login,
+            avatar_url: rawProfile.avatar_url || fbUser.photoURL || `https://github.com/${login}.png`,
+          },
+          accessToken,
+          fbUser.uid
         );
-        if (reposRes.ok) {
-          repos = await reposRes.json();
-        }
-      } catch (err) {
-        console.warn('Could not fetch user repos:', err);
+        return;
       }
 
-      // Compute real metrics
-      const totalStars = Array.isArray(repos)
-        ? repos.reduce((acc, r) => acc + (r.stargazers_count || 0), 0)
-        : 0;
-
-      const totalForks = Array.isArray(repos)
-        ? repos.reduce((acc, r) => acc + (r.forks_count || 0), 0)
-        : 0;
-
-      const languagesCount: Record<string, number> = {};
-      if (Array.isArray(repos)) {
-        repos.forEach((r) => {
-          if (r.language) {
-            languagesCount[r.language] = (languagesCount[r.language] || 0) + 1;
-          }
-        });
+      // Direct GitHub OAuth popup flow via server
+      const res = await fetch('/api/auth/github/url?platform=web');
+      if (!res.ok) {
+        throw new Error('Could not initialize GitHub OAuth.');
+      }
+      const data = await res.json();
+      if (!data.configured || !data.url) {
+        throw new Error(data.message || 'GitHub OAuth Client ID is not configured yet.');
       }
 
-      const topLanguages = Object.entries(languagesCount)
-        .sort((a, b) => b[1] - a[1])
-        .map(([language, count]) => ({ language, count }));
-
-      const stats: GitHubStats = {
-        totalStars,
-        totalForks,
-        publicRepos: userProfile.public_repos || repos.length,
-        followers: userProfile.followers,
-        topLanguages
-      };
-
-      const formattedRepos: GitHubRepo[] = Array.isArray(repos)
-        ? repos.map((r) => ({
-            id: r.id,
-            name: r.name,
-            description: r.description,
-            html_url: r.html_url,
-            stars: r.stargazers_count,
-            forks: r.forks_count,
-            language: r.language,
-            updated_at: r.updated_at
-          }))
-        : [];
-
-      // 3. Save to Firestore under user document
-      try {
-        await setDoc(doc(db, 'users', fbUser.uid), {
-          ...userProfile,
-          uid: fbUser.uid,
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      } catch (e) {
-        console.warn('Firestore user doc sync notice:', e);
+      const authWindow = window.open(data.url, 'github_oauth_popup', 'width=600,height=720');
+      if (!authWindow) {
+        throw new Error('Sign-in popup was blocked by your browser. Please allow popups.');
       }
-
-      onLoginSuccess(userProfile, stats, formattedRepos, accessToken);
-      onShowToast(`Signed in as @${login}! Live stats synchronized.`);
-      setIsLoading(false);
-      onClose();
     } catch (err: any) {
       console.error('GitHub authentication error:', err);
       if (err.code === 'auth/operation-not-allowed') {

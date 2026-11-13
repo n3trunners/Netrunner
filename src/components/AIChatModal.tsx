@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Send, Square, Sparkles, Settings as SettingsIcon, 
-  Trash2, AlertCircle, Bot, ArrowUp, RefreshCw, Layers,
+  Trash2, AlertCircle, Bot, ArrowUp, RefreshCw,
   Key, Eye, EyeOff, ExternalLink, Loader2
 } from 'lucide-react';
 import { NetRunnerLogo } from './Icons';
@@ -27,7 +27,6 @@ interface AIChatModalProps {
   project?: Project | null;
   initialPrompt?: string | null;
   onClearInitialPrompt?: () => void;
-  onOpenHybridStudio?: () => void;
   onClose: () => void;
   onOpenSettings: (modalType: 'models') => void;
   onShowToast: (msg: string) => void;
@@ -48,7 +47,6 @@ export function AIChatModal({
   project = null,
   initialPrompt = null,
   onClearInitialPrompt,
-  onOpenHybridStudio,
   onClose,
   onOpenSettings,
   onShowToast,
@@ -415,21 +413,6 @@ export function AIChatModal({
             </div>
 
             <div className="flex items-center gap-1.5">
-              {onOpenHybridStudio && (
-                <button
-                  onClick={() => {
-                    onClose();
-                    onOpenHybridStudio();
-                  }}
-                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-medium flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer ${
-                    isDarkMode ? 'text-neutral-300 hover:text-white hover:bg-white/10' : 'text-neutral-600 hover:text-black hover:bg-neutral-100'
-                  }`}
-                  title="Open Kotlin + Rust Hybrid Architecture Studio"
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Kotlin / Rust</span>
-                </button>
-              )}
               <button
                 onClick={() => onOpenSettings('models')}
                 className={`p-1.5 rounded-xl transition-colors cursor-pointer ${

@@ -1,5 +1,9 @@
 package com.netrunner.ui.theme
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -11,6 +15,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,6 +25,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import com.netrunner.app.R
+
+val NetRunnerEase = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
+val NetRunnerThemeEase = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
 
 @Immutable
 data class NetRunnerVisualTokens(
@@ -112,12 +120,43 @@ private val LightPalette = lightColorScheme(
 )
 
 @Composable
+private fun animateThemeColor(target: Color, label: String): Color {
+    val color by animateColorAsState(
+        targetValue = target,
+        animationSpec = tween(durationMillis = 460, easing = NetRunnerThemeEase),
+        label = label,
+    )
+    return color
+}
+
+@Composable
 fun NetRunnerTheme(
     darkTheme: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val tokens = if (darkTheme) DarkTokens else LightTokens
-    CompositionLocalProvider(LocalNetRunnerTokens provides tokens) {
+    val raw = if (darkTheme) DarkTokens else LightTokens
+    val animatedTokens = NetRunnerVisualTokens(
+        isDark = darkTheme,
+        backgroundBase = animateThemeColor(raw.backgroundBase, "bgBase"),
+        textTitle = animateThemeColor(raw.textTitle, "textTitle"),
+        textSub = animateThemeColor(raw.textSub, "textSub"),
+        textMuted = animateThemeColor(raw.textMuted, "textMuted"),
+        divider = animateThemeColor(raw.divider, "divider"),
+        cardBg = animateThemeColor(raw.cardBg, "cardBg"),
+        cardBorder = animateThemeColor(raw.cardBorder, "cardBorder"),
+        pillBg = animateThemeColor(raw.pillBg, "pillBg"),
+        pillBorder = animateThemeColor(raw.pillBorder, "pillBorder"),
+        pillText = animateThemeColor(raw.pillText, "pillText"),
+        inputBg = animateThemeColor(raw.inputBg, "inputBg"),
+        inputBorder = animateThemeColor(raw.inputBorder, "inputBorder"),
+        dockBg = animateThemeColor(raw.dockBg, "dockBg"),
+        dockBorder = animateThemeColor(raw.dockBorder, "dockBorder"),
+        accentBar = animateThemeColor(raw.accentBar, "accentBar"),
+        modalBg = animateThemeColor(raw.modalBg, "modalBg"),
+        modalBorder = animateThemeColor(raw.modalBorder, "modalBorder"),
+    )
+
+    CompositionLocalProvider(LocalNetRunnerTokens provides animatedTokens) {
         MaterialTheme(
             colorScheme = if (darkTheme) DarkPalette else LightPalette,
             content = content,
@@ -136,41 +175,49 @@ fun NetRunnerWallpaperBox(
             .fillMaxSize()
             .background(tokens.backgroundBase),
     ) {
-        if (tokens.isDark) {
-            Image(
-                painter = painterResource(id = R.drawable.bg_dark_wallpaper),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                alignment = Alignment.TopCenter,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0xFFF8FAFC),
-                                Color(0xFFEEF2F7),
+        Crossfade(
+            targetState = tokens.isDark,
+            animationSpec = tween(durationMillis = 480, easing = NetRunnerThemeEase),
+            label = "wallpaperThemeCrossfade",
+        ) { dark ->
+            if (dark) {
+                Image(
+                    painter = painterResource(id = R.drawable.bg_dark_wallpaper),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.TopCenter,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color(0xFFF8FAFC),
+                                        Color(0xFFEEF2F7),
+                                    ),
+                                ),
                             ),
-                        ),
-                    ),
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xD9E2E8F0),
-                                Color.Transparent,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        Color(0xD9E2E8F0),
+                                        Color.Transparent,
+                                    ),
+                                    center = Offset(0f, 0f),
+                                    radius = 900f,
+                                ),
                             ),
-                            center = Offset(0f, 0f),
-                            radius = 900f,
-                        ),
-                    ),
-            )
+                    )
+                }
+            }
         }
         content()
     }

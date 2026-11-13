@@ -75,6 +75,8 @@ export function SettingsModals({
   const [showToken, setShowToken] = useState(false);
   const [isVerifyingToken, setIsVerifyingToken] = useState(false);
   const [tokenVerifyMsg, setTokenVerifyMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [showModelProviderMenu, setShowModelProviderMenu] = useState(false);
+  const [selectedAddProvider, setSelectedAddProvider] = useState<'google-ai-studio' | null>(null);
 
   useEffect(() => {
     const sync = () => {
@@ -356,360 +358,223 @@ export function SettingsModals({
               </div>
             )}
 
-            {/* 2. Models */}
+            {/* 2. Models & API (Concise Card) */}
             {activeModal === 'models' && (
-              <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-semibold text-xs tracking-wide uppercase opacity-80">
-                      Model Providers
-                    </h4>
-                    <p className="text-xs opacity-75 mt-0.5">
-                      Configure inference models, API keys, and local LLM endpoints.
-                    </p>
-                  </div>
-                  {!isAdding && (
-                    <button
-                      onClick={() => setIsAdding(true)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer ${
-                        isDarkMode ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800'
-                      }`}
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Add Custom
-                    </button>
-                  )}
-                </div>
-
-                {/* Bring Your Own Token (BYOK) Provider Card */}
-                <div className={`p-4 rounded-2xl border space-y-3.5 ${
-                  isDarkMode 
-                    ? 'bg-gradient-to-br from-white/[0.06] to-white/[0.02] border-white/15 shadow-lg' 
-                    : 'bg-white border-neutral-300 shadow-md'
+              <div className="space-y-3">
+                <div className={`p-4 rounded-2xl border transition-colors ${
+                  isDarkMode
+                    ? 'bg-white/[0.035] border-white/12 shadow-lg'
+                    : 'bg-neutral-50 border-neutral-200 shadow-sm'
                 }`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className={`p-2 rounded-xl ${isDarkMode ? 'bg-white/10 text-white' : 'bg-neutral-900 text-white'}`}>
-                        <Key className="w-4 h-4" />
+                  {/* Concise Card Header: Present Configuration + Top-Right Plus Button */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                        hasSavedToken
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                          : isDarkMode
+                            ? 'bg-white/10 border-white/15 text-white'
+                            : 'bg-neutral-900 border-neutral-900 text-white'
+                      }`}>
+                        <Sparkles className="w-4 h-4" />
                       </div>
-                      <div>
-                        <div className="font-bold text-sm flex items-center gap-2 flex-wrap">
-                          <span>Bring Your Own Token</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm truncate">
+                            {hasSavedToken ? 'Google AI Studio' : 'No Active Key'}
+                          </span>
                           <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
                             hasSavedToken
                               ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                              : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                              : isDarkMode
+                                ? 'bg-white/5 border-white/12 text-neutral-400'
+                                : 'bg-neutral-200 border-neutral-300 text-neutral-600'
                           }`}>
-                            {hasSavedToken ? 'Personal Key Active' : 'Token Required'}
+                            {hasSavedToken ? 'Active' : 'Empty'}
                           </span>
                         </div>
-                        <div className="text-xs opacity-70">
-                          Developer studio powered by your own API key
+                        <div className="text-xs opacity-65 mt-0.5 font-mono truncate">
+                          {hasSavedToken
+                            ? `${maskToken(getByokConfig().apiKey)} · ${geminiModel}`
+                            : 'Tap + to add a Google AI Studio key'}
                         </div>
                       </div>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = !showModelProviderMenu;
+                        setShowModelProviderMenu(next);
+                        if (!next) {
+                          setSelectedAddProvider(null);
+                        }
+                        setTokenVerifyMsg(null);
+                      }}
+                      className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+                        showModelProviderMenu
+                          ? isDarkMode
+                            ? 'bg-white text-black border-white rotate-45'
+                            : 'bg-neutral-900 text-white border-neutral-900 rotate-45'
+                          : isDarkMode
+                            ? 'bg-white/10 border-white/15 text-white hover:bg-white/20'
+                            : 'bg-white border-neutral-300 text-neutral-800 hover:bg-neutral-100'
+                      }`}
+                      aria-label="Add API key"
+                      title="Add API key"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
                   </div>
 
-                  {/* Explicit No-Free-Tokens Notice */}
-                  <div className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 leading-relaxed ${
-                    isDarkMode ? 'bg-white/[0.02] border-white/10 text-neutral-300' : 'bg-neutral-50 border-neutral-200 text-neutral-700'
-                  }`}>
-                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <div>
-                      NetRunner does not supply free AI tokens. Your personal API key stays in your browser and is sent only with your requests.
+                  {hasSavedToken && !showModelProviderMenu && (
+                    <div className={`mt-3 pt-3 border-t flex items-center justify-between text-xs ${
+                      isDarkMode ? 'border-white/10' : 'border-neutral-200'
+                    }`}>
+                      <span className="opacity-60">Stored locally on this device</span>
+                      <button
+                        type="button"
+                        onClick={handleClearToken}
+                        className="text-red-400 hover:underline font-medium cursor-pointer"
+                      >
+                        Remove
+                      </button>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Provider Selector */}
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-medium opacity-80 block">
-                      AI Provider
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {(
-                        [
-                          { id: 'gemini', label: 'Google Gemini' },
-                          { id: 'openai-compatible', label: 'OpenAI-Compatible' },
-                        ] as const
-                      ).map((opt) => {
-                        const selected = aiProvider === opt.id;
-                        return (
+                  {/* Step 1: Smoothly reveal allowed provider (Google AI Studio) */}
+                  <AnimatePresence initial={false}>
+                    {showModelProviderMenu && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                        className="overflow-hidden"
+                      >
+                        <div className={`mt-4 pt-3.5 border-t space-y-3 ${
+                          isDarkMode ? 'border-white/10' : 'border-neutral-200'
+                        }`}>
+                          <div className="text-[11px] font-medium opacity-70">
+                            Select Provider
+                          </div>
                           <button
-                            key={opt.id}
                             type="button"
-                            onClick={() => {
-                              setAiProvider(opt.id);
-                              if (opt.id === 'gemini' && !geminiModel.startsWith('gemini')) {
-                                setGeminiModel('gemini-4-hydrogen');
-                              } else if (opt.id === 'openai-compatible' && geminiModel.startsWith('gemini')) {
-                                setGeminiModel('gpt-4o-mini');
-                              }
-                            }}
-                            className={`px-3 py-2 rounded-xl border text-xs font-medium transition-colors cursor-pointer ${
-                              selected
+                            onClick={() => setSelectedAddProvider('google-ai-studio')}
+                            className={`w-full p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer ${
+                              selectedAddProvider === 'google-ai-studio'
                                 ? isDarkMode
                                   ? 'bg-white text-black border-white font-semibold'
                                   : 'bg-neutral-900 text-white border-neutral-900 font-semibold'
                                 : isDarkMode
-                                  ? 'bg-white/[0.04] border-white/10 text-neutral-300 hover:bg-white/[0.08]'
-                                  : 'bg-neutral-50 border-neutral-200 text-neutral-700 hover:bg-neutral-100'
+                                  ? 'bg-white/[0.04] border-white/12 text-white hover:bg-white/[0.08]'
+                                  : 'bg-white border-neutral-300 text-neutral-900 hover:bg-neutral-100'
                             }`}
                           >
-                            {opt.label}
+                            <div className="flex items-center gap-2.5">
+                              <Sparkles className="w-4 h-4" />
+                              <span className="text-xs font-semibold">Google AI Studio</span>
+                            </div>
+                            <span className="text-[10px] font-mono opacity-75">Gemini API</span>
                           </button>
-                        );
-                      })}
-                    </div>
-                  </div>
 
-                  {/* Personal API Token Input */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] font-medium opacity-80">
-                      <span>Your API Token</span>
-                      <a
-                        href="https://aistudio.google.com/apikey"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 hover:underline opacity-80 hover:opacity-100"
-                      >
-                        <span>Get Gemini Key</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
+                          {/* Step 2: Butter-smooth key entry pop-out when Google AI Studio is clicked */}
+                          <AnimatePresence initial={false}>
+                            {selectedAddProvider === 'google-ai-studio' && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0, y: -6 }}
+                                animate={{ opacity: 1, height: 'auto', y: 0 }}
+                                exit={{ opacity: 0, height: 0, y: -6 }}
+                                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                                className="overflow-hidden"
+                              >
+                                <div className="pt-1 space-y-3">
+                                  <div className="flex items-center justify-between text-[11px] opacity-75">
+                                    <span>Enter Google AI Studio Key</span>
+                                    <a
+                                      href="https://aistudio.google.com/apikey"
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-1 hover:underline"
+                                    >
+                                      <span>Get key</span>
+                                      <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                  </div>
 
-                    <div className="relative flex items-center">
-                      <input
-                        type={showToken ? 'text' : 'password'}
-                        value={apiTokenInput}
-                        onChange={(e) => setApiTokenInput(e.target.value)}
-                        placeholder={aiProvider === 'gemini' ? 'AIza... (paste your Gemini key)' : 'sk-... (paste your provider token)'}
-                        autoComplete="off"
-                        className={`w-full pr-10 pl-3 py-2.5 rounded-xl border text-xs font-mono focus:outline-none ${
-                          isDarkMode 
-                            ? 'bg-white/[0.04] border-white/10 text-white placeholder-neutral-500 focus:border-white/30' 
-                            : 'bg-white border-neutral-300 text-neutral-900 placeholder-neutral-400 focus:border-neutral-600'
-                        }`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowToken(!showToken)}
-                        className="absolute right-2.5 p-1 opacity-60 hover:opacity-100 cursor-pointer"
-                        title={showToken ? 'Hide token' : 'Show token'}
-                      >
-                        {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                    {hasSavedToken && (
-                      <div className="text-[11px] font-mono opacity-60">
-                        Saved in browser: {maskToken(getByokConfig().apiKey)}
-                      </div>
-                    )}
-                  </div>
+                                  <div className="relative flex items-center">
+                                    <input
+                                      type={showToken ? 'text' : 'password'}
+                                      value={apiTokenInput}
+                                      onChange={(e) => setApiTokenInput(e.target.value)}
+                                      placeholder="AIza..."
+                                      autoComplete="off"
+                                      autoFocus
+                                      className={`w-full pr-10 pl-3 py-2.5 rounded-xl border text-xs font-mono focus:outline-none ${
+                                        isDarkMode
+                                          ? 'bg-white/[0.05] border-white/15 text-white placeholder-neutral-500 focus:border-white/35'
+                                          : 'bg-white border-neutral-300 text-neutral-900 placeholder-neutral-400 focus:border-neutral-600'
+                                      }`}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowToken(!showToken)}
+                                      className="absolute right-2.5 p-1 opacity-60 hover:opacity-100 cursor-pointer"
+                                      title={showToken ? 'Hide key' : 'Show key'}
+                                    >
+                                      {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                    </button>
+                                  </div>
 
-                  {/* Optional Base URL for OpenAI-compatible */}
-                  {aiProvider === 'openai-compatible' && (
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-medium opacity-80 block">
-                        Base URL <span className="opacity-50 font-normal">(optional, defaults to OpenAI)</span>
-                      </label>
-                      <input
-                        type="url"
-                        value={aiBaseUrl}
-                        onChange={(e) => setAiBaseUrl(e.target.value)}
-                        placeholder="https://openrouter.ai/api/v1"
-                        className={`w-full px-3 py-2 rounded-xl border text-xs font-mono focus:outline-none ${
-                          isDarkMode 
-                            ? 'bg-white/[0.04] border-white/10 text-white placeholder-neutral-500' 
-                            : 'bg-white border-neutral-300 text-neutral-900 placeholder-neutral-400'
-                        }`}
-                      />
-                    </div>
-                  )}
+                                  {tokenVerifyMsg && (
+                                    <div className={`p-2.5 rounded-xl border text-xs flex items-start gap-2 ${
+                                      tokenVerifyMsg.ok
+                                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                        : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                                    }`}>
+                                      {tokenVerifyMsg.ok ? <Check className="w-3.5 h-3.5 shrink-0 mt-0.5" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
+                                      <span>{tokenVerifyMsg.text}</span>
+                                    </div>
+                                  )}
 
-                  {/* Model ID dropdown + editable text field */}
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-medium opacity-80 flex items-center justify-between">
-                      <span>Model ID</span>
-                      <span className="text-[10px] opacity-60">Editable / Type custom</span>
-                    </label>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {aiProvider === 'gemini' ? (
-                        <select
-                          value={['gemini-4-hydrogen', 'gemini-4-argon', 'gemini-4-carbon', 'gemini-3.1-flash-lite'].includes(geminiModel) ? geminiModel : 'custom'}
-                          onChange={(e) => {
-                            if (e.target.value !== 'custom') {
-                              setGeminiModel(e.target.value);
-                            }
-                          }}
-                          className={`px-3 py-2 rounded-xl border text-xs focus:outline-none cursor-pointer ${
-                            isDarkMode 
-                              ? 'bg-[#12141a] border-white/10 text-white' 
-                              : 'bg-white border-neutral-300 text-neutral-900'
-                          }`}
-                        >
-                          <option value="gemini-4-hydrogen">gemini-4-hydrogen (Default)</option>
-                          <option value="gemini-4-argon">gemini-4-argon (Coding/Pro)</option>
-                          <option value="gemini-4-carbon">gemini-4-carbon (Deep Reasoning)</option>
-                          <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite (Fast)</option>
-                          <option value="custom">Custom Model ID...</option>
-                        </select>
-                      ) : (
-                        <select
-                          value={['gpt-4o-mini', 'gpt-4o', 'deepseek-chat', 'claude-3-5-sonnet-latest'].includes(geminiModel) ? geminiModel : 'custom'}
-                          onChange={(e) => {
-                            if (e.target.value !== 'custom') {
-                              setGeminiModel(e.target.value);
-                            }
-                          }}
-                          className={`px-3 py-2 rounded-xl border text-xs focus:outline-none cursor-pointer ${
-                            isDarkMode 
-                              ? 'bg-[#12141a] border-white/10 text-white' 
-                              : 'bg-white border-neutral-300 text-neutral-900'
-                          }`}
-                        >
-                          <option value="gpt-4o-mini">gpt-4o-mini</option>
-                          <option value="gpt-4o">gpt-4o</option>
-                          <option value="deepseek-chat">deepseek-chat</option>
-                          <option value="claude-3-5-sonnet-latest">claude-3-5-sonnet-latest</option>
-                          <option value="custom">Custom Model ID...</option>
-                        </select>
-                      )}
-
-                      <input
-                        type="text"
-                        value={geminiModel}
-                        onChange={(e) => setGeminiModel(e.target.value)}
-                        placeholder="Model ID"
-                        className={`px-3 py-2 rounded-xl border text-xs font-mono focus:outline-none ${
-                          isDarkMode 
-                            ? 'bg-white/[0.04] border-white/10 text-white placeholder-neutral-500' 
-                            : 'bg-white border-neutral-300 text-neutral-900 placeholder-neutral-400'
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  {tokenVerifyMsg && (
-                    <div className={`p-2.5 rounded-xl border text-xs flex items-start gap-2 ${
-                      tokenVerifyMsg.ok
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                        : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-                    }`}>
-                      {tokenVerifyMsg.ok ? <Check className="w-3.5 h-3.5 shrink-0 mt-0.5" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
-                      <span>{tokenVerifyMsg.text}</span>
-                    </div>
-                  )}
-
-                  {/* Save / Verify / Clear buttons */}
-                  <div className={`flex flex-wrap items-center justify-between gap-2 pt-2 border-t ${isDarkMode ? 'border-white/10' : 'border-neutral-200'}`}>
-                    {hasSavedToken ? (
-                      <button
-                        type="button"
-                        onClick={handleClearToken}
-                        className="px-3 py-1.5 rounded-xl text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                      >
-                        Clear Token
-                      </button>
-                    ) : (
-                      <span />
-                    )}
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        disabled={isVerifyingToken || !apiTokenInput.trim()}
-                        onClick={() => handleSaveTokenAndModel(true)}
-                        className={`px-3.5 py-1.5 rounded-xl border text-xs font-medium transition-all disabled:opacity-40 flex items-center gap-1.5 cursor-pointer ${
-                          isDarkMode
-                            ? 'bg-white/5 border-white/15 text-white hover:bg-white/10'
-                            : 'bg-neutral-100 border-neutral-300 text-neutral-900 hover:bg-neutral-200'
-                        }`}
-                      >
-                        {isVerifyingToken && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                        <span>Verify & Save</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSaveTokenAndModel(false)}
-                        className={`px-4 py-1.5 rounded-xl text-xs font-semibold shadow-md transition-all cursor-pointer ${
-                          isDarkMode 
-                            ? 'bg-white text-black hover:bg-neutral-200' 
-                            : 'bg-neutral-900 text-white hover:bg-black'
-                        }`}
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {isAdding && (
-                  <div className={`p-4 rounded-2xl border space-y-3 ${
-                    isDarkMode ? 'bg-white/[0.04] border-white/15' : 'bg-neutral-50 border-neutral-200'
-                  }`}>
-                    <div className="text-xs font-semibold">Add Custom Model Configuration</div>
-                    <input
-                      type="text"
-                      placeholder="Model Name (e.g. gpt-4o, llama3, mistral)"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none ${
-                        isDarkMode ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-neutral-300 text-neutral-900'
-                      }`}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Provider / Endpoint (e.g. Ollama http://localhost:11434)"
-                      value={newDetail}
-                      onChange={(e) => setNewDetail(e.target.value)}
-                      className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none ${
-                        isDarkMode ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-neutral-300 text-neutral-900'
-                      }`}
-                    />
-                    <div className="flex justify-end gap-2 pt-1">
-                      <button
-                        onClick={() => setIsAdding(false)}
-                        className="px-3 py-1.5 rounded-full text-xs opacity-70 hover:opacity-100 cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleAddIntegration('model')}
-                        disabled={!newName.trim()}
-                        className={`px-4 py-1.5 rounded-full text-xs font-semibold disabled:opacity-40 cursor-pointer ${
-                          isDarkMode ? 'bg-white text-black hover:bg-neutral-200' : 'bg-neutral-900 text-white hover:bg-black'
-                        }`}
-                      >
-                        Save Model
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Additional Custom Models */}
-                {models.length > 0 && (
-                  <div className="space-y-2 pt-2">
-                    <div className="text-[11px] font-semibold uppercase tracking-wider opacity-60">
-                      Additional Custom Endpoints ({models.length})
-                    </div>
-                    {models.map((m) => (
-                      <div key={m.id} className={`p-3 rounded-2xl border flex items-center justify-between ${
-                        isDarkMode ? 'bg-white/[0.03] border-white/8' : 'bg-neutral-50 border-neutral-200'
-                      }`}>
-                        <div>
-                          <div className="font-medium text-xs">{m.name}</div>
-                          <div className="text-[11px] opacity-60">{m.type}</div>
+                                  <div className="flex justify-end gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setShowModelProviderMenu(false);
+                                        setSelectedAddProvider(null);
+                                      }}
+                                      className="px-3.5 py-2 rounded-full text-xs opacity-70 hover:opacity-100 cursor-pointer"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={!apiTokenInput.trim()}
+                                      onClick={async () => {
+                                        setAiProvider('gemini');
+                                        await handleSaveTokenAndModel(false);
+                                        setShowModelProviderMenu(false);
+                                        setSelectedAddProvider(null);
+                                      }}
+                                      className={`px-5 py-2 rounded-full text-xs font-semibold disabled:opacity-40 transition-all cursor-pointer ${
+                                        isDarkMode
+                                          ? 'bg-white text-black hover:bg-neutral-200'
+                                          : 'bg-neutral-900 text-white hover:bg-black'
+                                      }`}
+                                    >
+                                      Save
+                                    </button>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
-                        <button
-                          onClick={() => handleDeleteItem(m.id, 'model')}
-                          className="p-1.5 rounded-lg opacity-60 hover:opacity-100 hover:text-red-500 cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
             )}
 

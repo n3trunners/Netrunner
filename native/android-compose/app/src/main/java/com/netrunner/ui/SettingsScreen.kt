@@ -1,8 +1,15 @@
 package com.netrunner.ui
 
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,7 +19,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -44,11 +50,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -57,7 +68,27 @@ import com.netrunner.model.GitHubUser
 import com.netrunner.model.SettingsModalType
 import com.netrunner.ui.components.GitHubMarkIcon
 import com.netrunner.ui.components.NetworkAvatarImage
+import com.netrunner.ui.components.rememberPressScaleInteraction
 import com.netrunner.ui.theme.LocalNetRunnerTokens
+import com.netrunner.ui.theme.NetRunnerEase
+
+@Composable
+private fun Modifier.settingsSectionReveal(visible: Boolean, delayMillis: Int): Modifier {
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(durationMillis = 320, delayMillis = delayMillis, easing = NetRunnerEase),
+        label = "settingsAlpha_$delayMillis",
+    )
+    val offsetY by animateFloatAsState(
+        targetValue = if (visible) 0f else 14f,
+        animationSpec = tween(durationMillis = 360, delayMillis = delayMillis, easing = NetRunnerEase),
+        label = "settingsOffset_$delayMillis",
+    )
+    return this.graphicsLayer {
+        this.alpha = alpha
+        this.translationY = offsetY * density
+    }
+}
 
 @Composable
 fun SettingsScreen(
@@ -69,9 +100,15 @@ fun SettingsScreen(
     onOpenGitHubAuth: () -> Unit,
 ) {
     val tokens = LocalNetRunnerTokens.current
+    var isVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        isVisible = true
+    }
+
     val thumbOffset by animateDpAsState(
         targetValue = if (tokens.isDark) 0.dp else 28.dp,
-        animationSpec = spring(stiffness = 320f, dampingRatio = 0.85f),
+        animationSpec = spring(stiffness = 380f, dampingRatio = 0.76f),
         label = "themePillOffset",
     )
 
@@ -93,7 +130,9 @@ fun SettingsScreen(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
-                modifier = Modifier.padding(top = 2.dp),
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .settingsSectionReveal(isVisible, delayMillis = 0),
             ) {
                 Icon(
                     imageVector = Icons.Rounded.ChevronLeft,
@@ -128,6 +167,7 @@ fun SettingsScreen(
 
         // Real Account Profile Card
         item {
+            val (profileInteraction, profileScale) = rememberPressScaleInteraction(0.975f)
             Surface(
                 onClick = {
                     if (currentUser != null) {
@@ -136,10 +176,17 @@ fun SettingsScreen(
                         onOpenGitHubAuth()
                     }
                 },
+                interactionSource = profileInteraction,
                 shape = RoundedCornerShape(16.dp),
                 color = tokens.cardBg,
                 border = BorderStroke(1.dp, tokens.cardBorder),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .settingsSectionReveal(isVisible, delayMillis = 40)
+                    .graphicsLayer {
+                        scaleX = profileScale
+                        scaleY = profileScale
+                    },
             ) {
                 Row(
                     modifier = Modifier
@@ -205,7 +252,10 @@ fun SettingsScreen(
 
         // Section 1: AI & Integrations
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.settingsSectionReveal(isVisible, delayMillis = 80),
+            ) {
                 SectionHeader("AI & Integrations")
                 SettingRow(
                     icon = Icons.Rounded.Extension,
@@ -216,7 +266,7 @@ fun SettingsScreen(
                 SettingRow(
                     icon = Icons.Rounded.ViewInAr,
                     title = "Models & API Token",
-                    subtitle = "Bring your own token & choose AI models",
+                    subtitle = "Manage your Google AI Studio API key",
                     onClick = { onOpenModal(SettingsModalType.MODELS) },
                 )
                 SettingRow(
@@ -236,10 +286,13 @@ fun SettingsScreen(
 
         // Section 2: Preferences
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.settingsSectionReveal(isVisible, delayMillis = 120),
+            ) {
                 SectionHeader("Preferences")
 
-                // Appearance row with animated Moon/Sun pill toggle
+                // Appearance row with animated Moon/Sun crossfade + pill toggle
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = tokens.cardBg,
@@ -257,12 +310,23 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                         ) {
-                            Icon(
-                                imageVector = if (tokens.isDark) Icons.Rounded.DarkMode else Icons.Rounded.LightMode,
-                                contentDescription = null,
-                                tint = tokens.textTitle,
-                                modifier = Modifier.size(20.dp),
-                            )
+                            AnimatedContent(
+                                targetState = tokens.isDark,
+                                transitionSpec = {
+                                    (scaleIn(initialScale = 0.72f, animationSpec = tween(260, easing = NetRunnerEase)) + fadeIn(tween(220)))
+                                        .togetherWith(
+                                            scaleOut(targetScale = 0.72f, animationSpec = tween(180)) + fadeOut(tween(160)),
+                                        )
+                                },
+                                label = "themeIconTransition",
+                            ) { dark ->
+                                Icon(
+                                    imageVector = if (dark) Icons.Rounded.DarkMode else Icons.Rounded.LightMode,
+                                    contentDescription = null,
+                                    tint = tokens.textTitle,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
                             Column {
                                 Text(
                                     text = "Appearance",
@@ -279,14 +343,20 @@ fun SettingsScreen(
                         }
 
                         // Animated Pill Switch
+                        val (themeInteraction, themeScale) = rememberPressScaleInteraction(0.94f)
                         Surface(
                             onClick = onToggleTheme,
+                            interactionSource = themeInteraction,
                             shape = CircleShape,
                             color = if (tokens.isDark) Color(0xFF15171D) else Color(0xFFE2E8F0),
                             border = BorderStroke(
                                 1.dp,
                                 if (tokens.isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFCBD5E1),
                             ),
+                            modifier = Modifier.graphicsLayer {
+                                scaleX = themeScale
+                                scaleY = themeScale
+                            },
                         ) {
                             Box(modifier = Modifier.padding(4.dp)) {
                                 Box(
@@ -348,7 +418,10 @@ fun SettingsScreen(
 
         // Section 3: Data & Storage
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.settingsSectionReveal(isVisible, delayMillis = 160),
+            ) {
                 SectionHeader("Data & Storage")
                 SettingRow(
                     icon = Icons.Rounded.Storage,
@@ -361,7 +434,10 @@ fun SettingsScreen(
 
         // Section 4: Security
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.settingsSectionReveal(isVisible, delayMillis = 195),
+            ) {
                 SectionHeader("Security")
                 SettingRow(
                     icon = Icons.Rounded.Shield,
@@ -374,7 +450,10 @@ fun SettingsScreen(
 
         // Section 5: About
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.settingsSectionReveal(isVisible, delayMillis = 225),
+            ) {
                 SectionHeader("About")
                 SettingRow(
                     icon = Icons.Rounded.Info,
@@ -421,12 +500,19 @@ private fun SettingRow(
     onClick: () -> Unit,
 ) {
     val tokens = LocalNetRunnerTokens.current
+    val (interactionSource, pressScale) = rememberPressScaleInteraction(0.98f)
     Surface(
         onClick = onClick,
+        interactionSource = interactionSource,
         shape = RoundedCornerShape(16.dp),
         color = tokens.cardBg,
         border = BorderStroke(1.dp, tokens.cardBorder),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            },
     ) {
         Row(
             modifier = Modifier

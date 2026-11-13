@@ -18,6 +18,8 @@ build/
 *.pem
 *.key
 *.cert
+*.keystore
+*.jks
 credentials.json
 service-account*.json
 firebase-adminsdk*.json

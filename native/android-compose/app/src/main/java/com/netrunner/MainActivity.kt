@@ -8,8 +8,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -34,7 +45,6 @@ import com.netrunner.network.GitHubApiClient
 import com.netrunner.ui.BrowseScreen
 import com.netrunner.ui.DashboardScreen
 import com.netrunner.ui.GitHubAuthDialog
-import com.netrunner.ui.HybridArchitectureDialog
 import com.netrunner.ui.NewProjectDialog
 import com.netrunner.ui.ProfileScreen
 import com.netrunner.ui.SettingsDetailDialog
@@ -42,6 +52,7 @@ import com.netrunner.ui.SettingsScreen
 import com.netrunner.ui.WorkspaceTerminalScreen
 import com.netrunner.ui.components.BottomDock
 import com.netrunner.ui.components.ToastBanner
+import com.netrunner.ui.theme.NetRunnerEase
 import com.netrunner.ui.theme.NetRunnerTheme
 import com.netrunner.ui.theme.NetRunnerWallpaperBox
 import kotlinx.coroutines.delay
@@ -50,6 +61,8 @@ import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
     private var deepLinkTokenState by mutableStateOf<String?>(null)
+    private var deepLinkCodeState by mutableStateOf<String?>(null)
+    private var deepLinkErrorState by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,7 +82,8 @@ class MainActivity : ComponentActivity() {
             var activeSettingsModal by remember { mutableStateOf<SettingsModalType?>(null) }
             var isNewProjectOpen by remember { mutableStateOf(false) }
             var isGitHubAuthOpen by remember { mutableStateOf(false) }
-            var isHybridDialogOpen by remember { mutableStateOf(false) }
+            var isAuthorizingGitHub by remember { mutableStateOf(false) }
+            var githubAuthError by remember { mutableStateOf<String?>(null) }
             var selectedProject by remember { mutableStateOf<WorkspaceProject?>(null) }
             var toastMessage by remember { mutableStateOf<String?>(null) }
             var selectedLanguage by remember {
@@ -178,12 +192,47 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(deepLinkTokenState) {
                 val token = deepLinkTokenState ?: return@LaunchedEffect
                 deepLinkTokenState = null
-                GitHubApiClient.authenticate(token).onSuccess { res ->
+                isAuthorizingGitHub = true
+                githubAuthError = null
+                GitHubApiClient.authenticateWithToken(token).onSuccess { res ->
                     applyGitHubAuth(res.user, res.stats, res.repos, res.token)
+                    isAuthorizingGitHub = false
+                    isGitHubAuthOpen = false
                     showToast("Signed in as @${res.user.login}!")
                 }.onFailure { err ->
-                    showToast(err.message ?: "GitHub sign-in failed")
+                    isAuthorizingGitHub = false
+                    val msg = err.message ?: "GitHub sign-in failed"
+                    githubAuthError = msg
+                    showToast(msg)
                 }
+            }
+
+            // Handle deep link authorization code netrunner://auth?code=...
+            LaunchedEffect(deepLinkCodeState) {
+                val code = deepLinkCodeState ?: return@LaunchedEffect
+                deepLinkCodeState = null
+                isAuthorizingGitHub = true
+                githubAuthError = null
+                GitHubApiClient.exchangeCodeAndAuthenticate(code).onSuccess { res ->
+                    applyGitHubAuth(res.user, res.stats, res.repos, res.token)
+                    isAuthorizingGitHub = false
+                    isGitHubAuthOpen = false
+                    showToast("Signed in as @${res.user.login}!")
+                }.onFailure { err ->
+                    isAuthorizingGitHub = false
+                    val msg = err.message ?: "GitHub authorization failed"
+                    githubAuthError = msg
+                    showToast(msg)
+                }
+            }
+
+            // Handle deep link error netrunner://auth?error=...
+            LaunchedEffect(deepLinkErrorState) {
+                val errMsg = deepLinkErrorState ?: return@LaunchedEffect
+                deepLinkErrorState = null
+                isAuthorizingGitHub = false
+                githubAuthError = errMsg
+                showToast(errMsg)
             }
 
             BackHandler(enabled = selectedProject != null || isSettingsOpen || activeTab != ActiveTab.HOME) {
@@ -196,141 +245,201 @@ class MainActivity : ComponentActivity() {
 
             NetRunnerTheme(darkTheme = isDark) {
                 NetRunnerWallpaperBox {
-                    val activeProj = selectedProject
-                    if (activeProj != null) {
-                        WorkspaceTerminalScreen(
-                            project = activeProj,
-                            userApiToken = userApiToken,
-                            modelId = selectedModel,
-                            onOpenTokenSettings = { activeSettingsModal = SettingsModalType.MODELS },
-                            onBack = { selectedProject = null },
-                        )
-                    } else {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            val routeKey = when {
-                                isSettingsOpen -> "settings"
-                                activeTab == ActiveTab.BROWSE -> "browse"
-                                activeTab == ActiveTab.PROFILE -> "profile"
-                                else -> "home"
+                    AnimatedContent(
+                        targetState = selectedProject,
+                        transitionSpec = {
+                            if (targetState != null) {
+                                (slideInHorizontally(tween(280, easing = NetRunnerEase)) { it / 6 } +
+                                    fadeIn(tween(240)))
+                                    .togetherWith(
+                                        scaleOut(targetScale = 0.97f, animationSpec = tween(220)) + fadeOut(tween(180)),
+                                    )
+                            } else {
+                                (scaleIn(initialScale = 0.97f, animationSpec = tween(260, easing = NetRunnerEase)) +
+                                    fadeIn(tween(220)))
+                                    .togetherWith(
+                                        slideOutHorizontally(tween(240, easing = NetRunnerEase)) { it / 6 } +
+                                            fadeOut(tween(180)),
+                                    )
                             }
+                        },
+                        label = "workspaceTerminalTransition",
+                    ) { activeProj ->
+                        if (activeProj != null) {
+                            WorkspaceTerminalScreen(
+                                project = activeProj,
+                                userApiToken = userApiToken,
+                                modelId = selectedModel,
+                                onOpenTokenSettings = { activeSettingsModal = SettingsModalType.MODELS },
+                                onBack = { selectedProject = null },
+                            )
+                        } else {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                val routeKey = when {
+                                    isSettingsOpen -> "settings"
+                                    activeTab == ActiveTab.BROWSE -> "browse"
+                                    activeTab == ActiveTab.PROFILE -> "profile"
+                                    else -> "home"
+                                }
 
-                            Crossfade(
-                                targetState = routeKey,
-                                animationSpec = tween(220),
-                                label = "mainRouteCrossfade",
-                            ) { key ->
-                                when (key) {
-                                    "settings" -> SettingsScreen(
-                                        currentUser = currentUser,
-                                        selectedLanguage = selectedLanguage,
-                                        onBack = { isSettingsOpen = false },
-                                        onOpenModal = { activeSettingsModal = it },
-                                        onToggleTheme = {
-                                            isDark = !isDark
-                                            prefs.edit().putBoolean("dark_mode", isDark).apply()
-                                            showToast("Switched to ${if (isDark) "Dark" else "Light"} appearance")
-                                        },
-                                        onOpenGitHubAuth = { isGitHubAuthOpen = true },
-                                    )
-
-                                    "browse" -> BrowseScreen(
-                                        onBackToHome = { activeTab = ActiveTab.HOME },
-                                        onShowToast = ::showToast,
-                                    )
-
-                                    "profile" -> ProfileScreen(
-                                        currentUser = currentUser,
-                                        userStats = userStats,
-                                        userRepos = userRepos,
-                                        isRefreshing = isRefreshingStats,
-                                        onBackToHome = { activeTab = ActiveTab.HOME },
-                                        onOpenSettings = { isSettingsOpen = true },
-                                        onOpenGitHubAuth = { isGitHubAuthOpen = true },
-                                        onSignOut = {
-                                            currentUser = null
-                                            userStats = null
-                                            userRepos = emptyList()
-                                            githubToken = null
-                                            prefs.edit()
-                                                .remove("github_user")
-                                                .remove("github_stats")
-                                                .remove("github_repos")
-                                                .remove("github_token")
-                                                .apply()
-                                            showToast("Signed out of NetRunner")
-                                        },
-                                        onRefreshStats = {
-                                            val login = currentUser?.login ?: return@ProfileScreen
-                                            isRefreshingStats = true
-                                            scope.launch {
-                                                GitHubApiClient.syncLiveUser(login, githubToken)
-                                                    .onSuccess { res ->
-                                                        applyGitHubAuth(res.user, res.stats, res.repos, res.token)
-                                                        showToast("Live GitHub statistics synchronized!")
-                                                    }
-                                                    .onFailure {
-                                                        showToast("Could not refresh stats from GitHub API")
-                                                    }
-                                                isRefreshingStats = false
+                                AnimatedContent(
+                                    targetState = routeKey,
+                                    transitionSpec = {
+                                        when {
+                                            targetState == "settings" -> {
+                                                (slideInHorizontally(tween(280, easing = NetRunnerEase)) { it / 5 } +
+                                                    fadeIn(tween(240, easing = NetRunnerEase)))
+                                                    .togetherWith(
+                                                        slideOutHorizontally(tween(240, easing = NetRunnerEase)) { -it / 8 } +
+                                                            fadeOut(tween(180)),
+                                                    )
                                             }
-                                        },
-                                    )
+                                            initialState == "settings" -> {
+                                                (slideInHorizontally(tween(280, easing = NetRunnerEase)) { -it / 8 } +
+                                                    fadeIn(tween(240, easing = NetRunnerEase)))
+                                                    .togetherWith(
+                                                        slideOutHorizontally(tween(240, easing = NetRunnerEase)) { it / 5 } +
+                                                            fadeOut(tween(180)),
+                                                    )
+                                            }
+                                            else -> {
+                                                (scaleIn(initialScale = 0.975f, animationSpec = tween(240, easing = NetRunnerEase)) +
+                                                    fadeIn(tween(220, easing = NetRunnerEase)))
+                                                    .togetherWith(
+                                                        scaleOut(targetScale = 0.985f, animationSpec = tween(180)) +
+                                                            fadeOut(tween(160)),
+                                                    )
+                                            }
+                                        }
+                                    },
+                                    label = "mainRouteAnimatedContent",
+                                ) { key ->
+                                    when (key) {
+                                        "settings" -> SettingsScreen(
+                                            currentUser = currentUser,
+                                            selectedLanguage = selectedLanguage,
+                                            onBack = { isSettingsOpen = false },
+                                            onOpenModal = { activeSettingsModal = it },
+                                            onToggleTheme = {
+                                                isDark = !isDark
+                                                prefs.edit().putBoolean("dark_mode", isDark).apply()
+                                                showToast("Switched to ${if (isDark) "Dark" else "Light"} appearance")
+                                            },
+                                            onOpenGitHubAuth = {
+                                                githubAuthError = null
+                                                isGitHubAuthOpen = true
+                                            },
+                                        )
 
-                                    else -> DashboardScreen(
-                                        projects = projects,
-                                        hasApiToken = userApiToken.isNotBlank(),
-                                        selectedModel = selectedModel,
-                                        currentUser = currentUser,
-                                        userRepos = userRepos,
-                                        onOpenNewProjectModal = { isNewProjectOpen = true },
-                                        onOpenSettings = { isSettingsOpen = true },
-                                        onOpenTokenSettings = { activeSettingsModal = SettingsModalType.MODELS },
-                                        onOpenHybridStudio = { isHybridDialogOpen = true },
-                                        onOpenGitHubAuth = { isGitHubAuthOpen = true },
-                                        onImportGitHubRepo = { repo ->
-                                            if (projects.any { it.name == repo.name }) {
-                                                showToast("Repository \"${repo.name}\" is already in your workspace.")
-                                            } else {
-                                                projects.add(
-                                                    0,
-                                                    WorkspaceProject(
-                                                        id = "repo-${repo.id}",
-                                                        name = repo.name,
-                                                        description = repo.description ?: "Imported from GitHub",
-                                                        category = "Fullstack",
-                                                        architecture = "fullstack",
-                                                        updatedAt = "Imported",
-                                                        filesCount = 12,
-                                                        repoUrl = repo.htmlUrl,
-                                                    ),
-                                                )
+                                        "browse" -> BrowseScreen(
+                                            onBackToHome = { activeTab = ActiveTab.HOME },
+                                            onShowToast = ::showToast,
+                                        )
+
+                                        "profile" -> ProfileScreen(
+                                            currentUser = currentUser,
+                                            userStats = userStats,
+                                            userRepos = userRepos,
+                                            isRefreshing = isRefreshingStats,
+                                            onBackToHome = { activeTab = ActiveTab.HOME },
+                                            onOpenSettings = { isSettingsOpen = true },
+                                            onOpenGitHubAuth = {
+                                                githubAuthError = null
+                                                isGitHubAuthOpen = true
+                                            },
+                                            onSignOut = {
+                                                currentUser = null
+                                                userStats = null
+                                                userRepos = emptyList()
+                                                githubToken = null
+                                                prefs.edit()
+                                                    .remove("github_user")
+                                                    .remove("github_stats")
+                                                    .remove("github_repos")
+                                                    .remove("github_token")
+                                                    .apply()
+                                                showToast("Signed out of NetRunner")
+                                            },
+                                            onRefreshStats = {
+                                                val login = currentUser?.login ?: return@ProfileScreen
+                                                isRefreshingStats = true
+                                                scope.launch {
+                                                    GitHubApiClient.syncLiveUser(login, githubToken)
+                                                        .onSuccess { res ->
+                                                            applyGitHubAuth(res.user, res.stats, res.repos, res.token)
+                                                            showToast("Live GitHub statistics synchronized!")
+                                                        }
+                                                        .onFailure {
+                                                            showToast("Could not refresh stats from GitHub API")
+                                                        }
+                                                    isRefreshingStats = false
+                                                }
+                                            },
+                                        )
+
+                                        else -> DashboardScreen(
+                                            projects = projects,
+                                            currentUser = currentUser,
+                                            userRepos = userRepos,
+                                            onOpenNewProjectModal = { isNewProjectOpen = true },
+                                            onOpenSettings = { isSettingsOpen = true },
+                                            onOpenGitHubAuth = {
+                                                githubAuthError = null
+                                                isGitHubAuthOpen = true
+                                            },
+                                            onImportGitHubRepo = { repo ->
+                                                if (projects.any { it.name == repo.name }) {
+                                                    showToast("Repository \"${repo.name}\" is already in your workspace.")
+                                                } else {
+                                                    projects.add(
+                                                        0,
+                                                        WorkspaceProject(
+                                                            id = "repo-${repo.id}",
+                                                            name = repo.name,
+                                                            description = repo.description ?: "Imported from GitHub",
+                                                            category = "Fullstack",
+                                                            architecture = "fullstack",
+                                                            updatedAt = "Imported",
+                                                            filesCount = 12,
+                                                            repoUrl = repo.htmlUrl,
+                                                        ),
+                                                    )
+                                                    persistProjects()
+                                                    showToast("Imported \"${repo.name}\" into workspace!")
+                                                }
+                                            },
+                                            onSelectProject = { selectedProject = it },
+                                            onDeleteProject = { id ->
+                                                val removed = projects.firstOrNull { it.id == id }
+                                                projects.removeAll { it.id == id }
                                                 persistProjects()
-                                                showToast("Imported \"${repo.name}\" into workspace!")
-                                            }
-                                        },
-                                        onSelectProject = { selectedProject = it },
-                                        onDeleteProject = { id ->
-                                            val removed = projects.firstOrNull { it.id == id }
-                                            projects.removeAll { it.id == id }
-                                            persistProjects()
-                                            if (removed != null) showToast("Deleted ${removed.name}")
-                                        },
-                                        onResetProjects = {
-                                            projects.clear()
-                                            persistProjects()
-                                            showToast("Cleared workspace projects to empty state")
-                                        },
+                                                if (removed != null) showToast("Deleted ${removed.name}")
+                                            },
+                                            onResetProjects = {
+                                                projects.clear()
+                                                persistProjects()
+                                                showToast("Cleared workspace projects to empty state")
+                                            },
+                                        )
+                                    }
+                                }
+
+                                // Floating Bottom Navigation Dock (slides smoothly in/out when Settings opens)
+                                AnimatedVisibility(
+                                    visible = !isSettingsOpen,
+                                    enter = slideInVertically(
+                                        animationSpec = spring(stiffness = 380f, dampingRatio = 0.8f),
+                                    ) { it } + fadeIn(tween(200)),
+                                    exit = slideOutVertically(
+                                        animationSpec = tween(200, easing = NetRunnerEase),
+                                    ) { it } + fadeOut(tween(150)),
+                                    modifier = Modifier.align(Alignment.BottomCenter),
+                                ) {
+                                    BottomDock(
+                                        activeTab = activeTab,
+                                        onChangeTab = { activeTab = it },
                                     )
                                 }
-                            }
-
-                            // Floating Bottom Navigation Dock (hidden inside Settings, matching website)
-                            if (!isSettingsOpen) {
-                                BottomDock(
-                                    activeTab = activeTab,
-                                    onChangeTab = { activeTab = it },
-                                    modifier = Modifier.align(Alignment.BottomCenter),
-                                )
                             }
                         }
                     }
@@ -346,11 +455,13 @@ class MainActivity : ComponentActivity() {
                     // Modals
                     if (isGitHubAuthOpen) {
                         GitHubAuthDialog(
-                            onDismiss = { isGitHubAuthOpen = false },
-                            onLoginSuccess = { res ->
-                                applyGitHubAuth(res.user, res.stats, res.repos, res.token)
+                            onDismiss = {
+                                isGitHubAuthOpen = false
+                                githubAuthError = null
                             },
-                            onShowToast = ::showToast,
+                            isAuthorizing = isAuthorizingGitHub,
+                            externalError = githubAuthError,
+                            onClearExternalError = { githubAuthError = null },
                         )
                     }
 
@@ -378,26 +489,6 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    if (isHybridDialogOpen) {
-                        HybridArchitectureDialog(
-                            onDismiss = { isHybridDialogOpen = false },
-                            onCreateHybridProject = {
-                                val created = WorkspaceProject(
-                                    id = "hybrid-${System.currentTimeMillis()}",
-                                    name = "netrunner-hybrid-core",
-                                    description = "Kotlin + Jetpack Compose Android UI with Rust Core Daemon",
-                                    category = "Hybrid",
-                                    architecture = "hybrid-kotlin-rust",
-                                    updatedAt = "Just now",
-                                    filesCount = 13,
-                                )
-                                projects.add(0, created)
-                                persistProjects()
-                                showToast("Created \"netrunner-hybrid-core\" workspace!")
-                            },
-                        )
-                    }
-
                     val modalType = activeSettingsModal
                     if (modalType != null) {
                         SettingsDetailDialog(
@@ -418,7 +509,7 @@ class MainActivity : ComponentActivity() {
                                     .putString("gemini_model", selectedModel)
                                     .apply()
                                 showToast(
-                                    if (token.isNotBlank()) "Personal token & $model saved locally"
+                                    if (token.isNotBlank()) "Google AI Studio key saved locally"
                                     else "Model set to $model",
                                 )
                             },
@@ -474,7 +565,10 @@ class MainActivity : ComponentActivity() {
                                 selectedLanguage = lang
                                 prefs.edit().putString("selected_language", lang).apply()
                             },
-                            onOpenGitHubAuth = { isGitHubAuthOpen = true },
+                            onOpenGitHubAuth = {
+                                githubAuthError = null
+                                isGitHubAuthOpen = true
+                            },
                             onSignOut = {
                                 currentUser = null
                                 userStats = null
@@ -498,15 +592,26 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleAuthIntent(intent)
     }
 
     private fun handleAuthIntent(intent: Intent?) {
         val data = intent?.data ?: return
         if (data.scheme == "netrunner" && data.host == "auth") {
-            val token = data.getQueryParameter("token") ?: data.getQueryParameter("username")
+            val error = data.getQueryParameter("error_description") ?: data.getQueryParameter("error")
+            if (!error.isNullOrBlank()) {
+                deepLinkErrorState = error
+                return
+            }
+            val token = data.getQueryParameter("token")
             if (!token.isNullOrBlank()) {
                 deepLinkTokenState = token
+                return
+            }
+            val code = data.getQueryParameter("code")
+            if (!code.isNullOrBlank()) {
+                deepLinkCodeState = code
             }
         }
     }

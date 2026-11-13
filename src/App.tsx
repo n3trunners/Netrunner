@@ -17,7 +17,6 @@ import { SettingsModals } from './components/SettingsModals';
 import { NewProjectModal } from './components/NewProjectModal';
 import { GitHubAuthModal } from './components/GitHubAuthModal';
 import { AIChatModal } from './components/AIChatModal';
-import { HybridArchitectureModal } from './components/HybridArchitectureModal';
 import { Toast } from './components/Toast';
 
 import { 
@@ -44,8 +43,6 @@ export default function App() {
   const [activeSettingsModal, setActiveSettingsModal] = useState<SettingsModalType>(null);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [isGitHubAuthOpen, setIsGitHubAuthOpen] = useState(false);
-  const [isHybridStudioOpen, setIsHybridStudioOpen] = useState(false);
-  const [hybridInitialPrompt, setHybridInitialPrompt] = useState<string | null>(null);
   const [activeProjectWorkspace, setActiveProjectWorkspace] = useState<Project | null>(null);
   const [isRefreshingStats, setIsRefreshingStats] = useState(false);
 
@@ -503,9 +500,7 @@ export default function App() {
                   projects={projects}
                   onOpenNewProjectModal={() => setIsNewProjectModalOpen(true)}
                   onOpenSettings={() => setIsSettingsOpen(true)}
-                  onOpenTokenSettings={() => setActiveSettingsModal('models')}
                   onOpenProjectWorkspace={(proj) => setActiveProjectWorkspace(proj)}
-                  onOpenHybridStudio={() => setIsHybridStudioOpen(true)}
                   onDeleteProject={handleDeleteProject}
                   onShowToast={showToast}
                   currentUser={currentUser}
@@ -565,55 +560,10 @@ export default function App() {
       <AIChatModal
         isOpen={Boolean(activeProjectWorkspace)}
         project={activeProjectWorkspace}
-        initialPrompt={hybridInitialPrompt}
-        onClearInitialPrompt={() => setHybridInitialPrompt(null)}
-        onOpenHybridStudio={() => setIsHybridStudioOpen(true)}
         onClose={() => setActiveProjectWorkspace(null)}
         onOpenSettings={(modalType) => setActiveSettingsModal(modalType)}
         onShowToast={showToast}
         isDarkMode={isDarkMode}
-      />
-
-      {/* Hybrid Architecture Studio (Kotlin + Jetpack Compose UI & Rust Core Daemon) */}
-      <HybridArchitectureModal
-        isOpen={isHybridStudioOpen}
-        onClose={() => setIsHybridStudioOpen(false)}
-        onShowToast={showToast}
-        currentUser={currentUser}
-        userRepos={userRepos}
-        githubToken={githubToken}
-        isDarkMode={isDarkMode}
-        onCreateHybridProject={() => {
-          handleCreateProject({
-            name: 'netrunner-hybrid-core',
-            description: 'Kotlin + Jetpack Compose Android UI with Rust Core Daemon',
-            category: 'Hybrid',
-            architecture: 'hybrid-kotlin-rust',
-            tags: ['Kotlin', 'Compose', 'Rust'],
-          });
-        }}
-        onAskGeminiWithFile={(filePath, content) => {
-          const snippet = content.length > 3500 ? `${content.slice(0, 3500)}\n// ...truncated` : content;
-          const targetProject: Project = activeProjectWorkspace ||
-            projects.find((p) => p.category === 'Hybrid') || {
-              id: `hybrid-${Date.now()}`,
-              name: 'netrunner-hybrid-core',
-              description: 'Kotlin + Jetpack Compose Android UI with Rust Core Daemon',
-              category: 'Hybrid',
-              architecture: 'hybrid-kotlin-rust',
-              updatedAt: 'Just now',
-              status: 'active',
-              filesCount: 13,
-              tags: ['Kotlin', 'Compose', 'Rust'],
-            };
-          if (!projects.some((p) => p.id === targetProject.id)) {
-            setProjects((prev) => [targetProject, ...prev]);
-          }
-          setHybridInitialPrompt(
-            `Review and extend \`native/${filePath}\` for our Hybrid Architecture (Kotlin + Jetpack Compose UI & Rust Core Daemon):\n\n\`\`\`\n${snippet}\n\`\`\``
-          );
-          setActiveProjectWorkspace(targetProject);
-        }}
       />
 
       {/* Floating System Toast */}

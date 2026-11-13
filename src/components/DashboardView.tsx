@@ -1,20 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { 
   Plus, Search, ChevronRight, Settings, 
-  Trash2, ExternalLink, Github, X, Key 
+  Trash2, ExternalLink, Github, X
 } from 'lucide-react';
 import { NetRunnerLogo, GlossyFolderGraphic } from './Icons';
 import { Project, GitHubUser, GitHubRepo } from '../types';
-import { BYOK_UPDATED_EVENT, getByokConfig } from '../utils/byok';
 
 interface DashboardViewProps {
   projects: Project[];
   onOpenNewProjectModal: () => void;
   onOpenSettings: () => void;
-  onOpenTokenSettings: () => void;
   onOpenProjectWorkspace: (project: Project) => void;
-  onOpenHybridStudio: () => void;
   onDeleteProject: (id: string) => void;
   onShowToast: (msg: string) => void;
   currentUser: GitHubUser | null;
@@ -28,9 +25,7 @@ export function DashboardView({
   projects,
   onOpenNewProjectModal,
   onOpenSettings,
-  onOpenTokenSettings,
   onOpenProjectWorkspace,
-  onOpenHybridStudio,
   onDeleteProject,
   onShowToast,
   currentUser,
@@ -41,13 +36,6 @@ export function DashboardView({
 }: DashboardViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [byokState, setByokState] = useState(() => getByokConfig());
-
-  useEffect(() => {
-    const sync = () => setByokState(getByokConfig());
-    window.addEventListener(BYOK_UPDATED_EVENT, sync);
-    return () => window.removeEventListener(BYOK_UPDATED_EVENT, sync);
-  }, []);
 
   const filteredProjects = projects.filter(p => {
     const matchesSearch = 
@@ -194,52 +182,6 @@ export function DashboardView({
             )}
           </div>
         </motion.div>
-
-        {/* Quick Access Cards: Hybrid Studio & BYOK AI Token */}
-        <div className="space-y-2.5">
-          <button
-            type="button"
-            onClick={onOpenTokenSettings}
-            className="w-full p-4 rounded-2xl app-card transition-all flex items-center justify-between text-left group cursor-pointer"
-          >
-            <div className="flex items-center gap-3 min-w-0 pr-3">
-              <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${
-                byokState.hasToken
-                  ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
-                  : 'bg-amber-500/10 border-amber-500/25 text-amber-400'
-              }`}>
-                <Key className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <div className="font-semibold text-sm app-text-title truncate">
-                  {byokState.hasToken ? 'Personal AI Token Active' : 'Add Your AI Token (BYOK)'}
-                </div>
-                <div className="text-xs app-text-sub mt-0.5 truncate">
-                  {byokState.hasToken
-                    ? `${byokState.model} · Using your own key`
-                    : 'No free tokens provided · Paste your Gemini key'}
-                </div>
-              </div>
-            </div>
-            <ChevronRight className="w-4 h-4 app-text-muted group-hover:translate-x-0.5 transition-transform shrink-0" />
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenHybridStudio}
-            className="w-full p-4 rounded-2xl app-card transition-all flex items-center justify-between text-left group cursor-pointer"
-          >
-            <div className="min-w-0 pr-3">
-              <div className="font-semibold text-sm app-text-title truncate">
-                Hybrid Architecture & CI/CD
-              </div>
-              <div className="text-xs app-text-sub mt-0.5 truncate">
-                Kotlin + Jetpack Compose · Rust Daemon · GitHub Actions
-              </div>
-            </div>
-            <ChevronRight className="w-4 h-4 app-text-muted group-hover:translate-x-0.5 transition-transform shrink-0" />
-          </button>
-        </div>
 
         {/* Main Content Area: Empty State OR Projects List */}
         {projects.length === 0 ? (

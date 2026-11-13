@@ -1,8 +1,11 @@
 package com.netrunner.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -11,6 +14,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
@@ -20,8 +25,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,12 +36,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Home
@@ -52,7 +59,6 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -65,6 +71,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -76,6 +83,21 @@ import com.netrunner.app.R
 import com.netrunner.model.ActiveTab
 import com.netrunner.network.GitHubApiClient
 import com.netrunner.ui.theme.LocalNetRunnerTokens
+import com.netrunner.ui.theme.NetRunnerEase
+
+@Composable
+fun rememberPressScaleInteraction(
+    pressedScale: Float = 0.97f,
+): Pair<MutableInteractionSource, Float> {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) pressedScale else 1f,
+        animationSpec = spring(stiffness = 620f, dampingRatio = 0.72f),
+        label = "pressScale",
+    )
+    return interactionSource to scale
+}
 
 @Composable
 fun NetRunnerLogo(
@@ -183,10 +205,24 @@ fun GlossyFolderGraphic(modifier: Modifier = Modifier) {
         ),
         label = "s2",
     )
+    val floatY by pulse.animateFloat(
+        initialValue = -2f,
+        targetValue = 3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "folderFloatY",
+    )
     val tokens = LocalNetRunnerTokens.current
     val sparkleColor = if (tokens.isDark) Color.White else Color(0xFF475569)
 
-    Box(modifier = modifier.size(128.dp), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = modifier
+            .size(128.dp)
+            .graphicsLayer { translationY = floatY.dp.toPx() },
+        contentAlignment = Alignment.Center,
+    ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val sx = size.width / 120f
             val sy = size.height / 100f
@@ -320,6 +356,8 @@ fun BottomDock(
         )
     }
 
+    val activeIndex = items.indexOfFirst { it.tab == activeTab }.coerceAtLeast(0)
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -336,62 +374,79 @@ fun BottomDock(
                 .widthIn(max = 340.dp)
                 .fillMaxWidth(),
         ) {
-            Row(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 30.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                    .padding(horizontal = 24.dp, vertical = 11.dp),
             ) {
-                items.forEach { item ->
-                    val isActive = activeTab == item.tab
-                    val iconScale by animateFloatAsState(
-                        targetValue = if (isActive) 1.12f else 1.0f,
-                        animationSpec = spring(stiffness = 500f, dampingRatio = 0.72f),
-                        label = "dockIconScale",
-                    )
-                    val indicatorAlpha by animateFloatAsState(
-                        targetValue = if (isActive) 1f else 0f,
-                        animationSpec = tween(220),
-                        label = "dockIndicatorAlpha",
-                    )
+                val slotWidth = maxWidth / items.size
+                val indicatorWidth = 24.dp
+                val targetIndicatorX = slotWidth * activeIndex + (slotWidth - indicatorWidth) / 2f
+                val indicatorOffsetX by animateDpAsState(
+                    targetValue = targetIndicatorX,
+                    animationSpec = spring(
+                        stiffness = 500f,
+                        dampingRatio = 0.78f,
+                    ),
+                    label = "dockIndicatorGlide",
+                )
 
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = { onChangeTab(item.tab) },
-                            )
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                    ) {
-                        Icon(
-                            imageVector = if (isActive) item.selectedIcon else item.unselectedIcon,
-                            contentDescription = item.label,
-                            tint = if (isActive) tokens.textTitle else tokens.textMuted,
-                            modifier = Modifier
-                                .size(24.dp)
-                                .scale(iconScale),
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    items.forEach { item ->
+                        val isActive = activeTab == item.tab
+                        val iconScale by animateFloatAsState(
+                            targetValue = if (isActive) 1.14f else 1.0f,
+                            animationSpec = spring(stiffness = 520f, dampingRatio = 0.72f),
+                            label = "dockIconScale",
                         )
-                        Spacer(Modifier.height(5.dp))
+                        val iconTint by animateColorAsState(
+                            targetValue = if (isActive) tokens.textTitle else tokens.textMuted,
+                            animationSpec = tween(200),
+                            label = "dockIconTint",
+                        )
+
                         Box(
+                            contentAlignment = Alignment.Center,
                             modifier = Modifier
-                                .width(24.dp)
-                                .height(2.5.dp)
-                                .alpha(indicatorAlpha)
+                                .weight(1f)
                                 .clip(CircleShape)
-                                .background(tokens.textTitle)
-                                .then(
-                                    if (isActive && tokens.isDark) {
-                                        Modifier.shadow(8.dp, CircleShape, ambientColor = Color.White, spotColor = Color.White)
-                                    } else Modifier
-                                ),
-                        )
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = { onChangeTab(item.tab) },
+                                )
+                                .padding(top = 3.dp, bottom = 9.dp),
+                        ) {
+                            Icon(
+                                imageVector = if (isActive) item.selectedIcon else item.unselectedIcon,
+                                contentDescription = item.label,
+                                tint = iconTint,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .scale(iconScale),
+                            )
+                        }
                     }
                 }
+
+                // Gliding bottom indicator bar (matches website Framer Motion layoutId="dock-indicator")
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .offset(x = indicatorOffsetX)
+                        .width(indicatorWidth)
+                        .height(2.5.dp)
+                        .clip(CircleShape)
+                        .background(tokens.textTitle)
+                        .then(
+                            if (tokens.isDark) {
+                                Modifier.shadow(8.dp, CircleShape, ambientColor = Color.White, spotColor = Color.White)
+                            } else Modifier,
+                        ),
+                )
             }
         }
     }
@@ -405,8 +460,18 @@ fun ToastBanner(
     val tokens = LocalNetRunnerTokens.current
     AnimatedVisibility(
         visible = message != null,
-        enter = slideInVertically { -it } + fadeIn(),
-        exit = slideOutVertically { -it } + fadeOut(),
+        enter = slideInVertically(
+            animationSpec = spring(stiffness = 420f, dampingRatio = 0.78f),
+        ) { -it } + scaleIn(
+            initialScale = 0.92f,
+            animationSpec = tween(220, easing = NetRunnerEase),
+        ) + fadeIn(tween(180)),
+        exit = slideOutVertically(
+            animationSpec = tween(200, easing = NetRunnerEase),
+        ) { -it } + scaleOut(
+            targetScale = 0.92f,
+            animationSpec = tween(180),
+        ) + fadeOut(tween(160)),
         modifier = modifier,
     ) {
         if (message != null) {

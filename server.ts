@@ -67,6 +67,7 @@ app.use(express.json({ limit: '2mb' }));
 app.get('/api/auth/github/url', (req, res) => {
   const clientId = process.env.GITHUB_CLIENT_ID;
   const redirectUri = `${APP_URL}/auth/callback`;
+  const platform = typeof req.query.platform === 'string' ? req.query.platform : 'web';
 
   if (!clientId) {
     return res.json({
@@ -76,11 +77,15 @@ app.get('/api/auth/github/url', (req, res) => {
     });
   }
 
+  const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const state = platform === 'android' ? `android:${nonce}` : `web:${nonce}`;
+
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
     scope: 'read:user,repo',
     allow_signup: 'true',
+    state,
   });
 
   const authUrl = `https://github.com/login/oauth/authorize?${params.toString()}`;
@@ -91,11 +96,16 @@ app.get('/api/auth/github/url', (req, res) => {
   });
 });
 
-// 2. OAuth Callback Route - Handles GitHub OAuth Code Exchange
+// 2. OAuth Callback Route - Handles GitHub OAuth Code Exchange (Web Popup + Android Deep Link)
 const handleOAuthCallback: RequestHandler = async (req, res) => {
-  const { code, error, error_description } = req.query;
+  const { code, error, error_description, state } = req.query;
+  const isAndroid = typeof state === 'string' && state.startsWith('android:');
 
   if (error || !code) {
+    if (isAndroid) {
+      const errMsg = encodeURIComponent(String(error_description || error || 'Missing authorization code'));
+      return res.redirect(`netrunner://auth?error=${errMsg}`);
+    }
     return res.send(`
       <!DOCTYPE html>
       <html>
@@ -144,6 +154,34 @@ const handleOAuthCallback: RequestHandler = async (req, res) => {
     }
 
     const accessToken = tokenData.access_token;
+
+    if (isAndroid) {
+      const deepLink = `netrunner://auth?token=${encodeURIComponent(accessToken)}`;
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Returning to NetRunner...</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <style>
+              body { background: #07080a; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 20px; }
+              .card { text-align: center; padding: 28px 24px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 24px; max-width: 340px; width: 100%; }
+              .btn { display: inline-block; margin-top: 16px; background: #fff; color: #000; text-decoration: none; font-weight: 600; font-size: 13px; padding: 12px 24px; border-radius: 999px; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h3 style="margin: 0 0 8px;">GitHub Connected</h3>
+              <p style="color: #9ca3af; font-size: 13px; margin: 0;">Returning to NetRunner Android...</p>
+              <a class="btn" href="${deepLink}">Open NetRunner</a>
+            </div>
+            <script>
+              window.location.replace(${JSON.stringify(deepLink)});
+            </script>
+          </body>
+        </html>
+      `);
+    }
 
     // Fetch user details from GitHub
     const userResponse = await fetch('https://api.github.com/user', {
@@ -204,6 +242,9 @@ const handleOAuthCallback: RequestHandler = async (req, res) => {
     `);
   } catch (err: any) {
     console.error('GitHub token exchange error:', err);
+    if (isAndroid) {
+      return res.redirect(`netrunner://auth?error=${encodeURIComponent(err.message || 'Authentication failed')}`);
+    }
     res.status(500).send(`
       <!DOCTYPE html>
       <html>
@@ -221,6 +262,41 @@ const handleOAuthCallback: RequestHandler = async (req, res) => {
 };
 
 app.get(['/auth/callback', '/auth/callback/'], handleOAuthCallback);
+
+app.post('/api/auth/github/exchange', async (req: Request, res: Response) => {
+  const { code, redirectUri } = (req.body || {}) as { code?: string; redirectUri?: string };
+  if (!code) {
+    return res.status(400).json({ error: 'Missing authorization code.' });
+  }
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    return res.status(500).json({ error: 'GitHub OAuth credentials are not configured on the server.' });
+  }
+
+  try {
+    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+        redirect_uri: redirectUri || `${APP_URL}/auth/callback`,
+      }),
+    });
+    const tokenData = await tokenResponse.json();
+    if (tokenData.error || !tokenData.access_token) {
+      return res.status(400).json({ error: tokenData.error_description || tokenData.error || 'Token exchange failed.' });
+    }
+    return res.json({ access_token: tokenData.access_token });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Failed to exchange OAuth code.' });
+  }
+});
 
 // 3. Real GitHub Stats API Proxy (fetches real user profile + repositories)
 app.get('/api/github/stats/:username', async (req, res) => {

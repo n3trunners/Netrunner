@@ -1,5 +1,14 @@
 package com.netrunner.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,13 +40,13 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +57,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -62,19 +72,35 @@ import com.netrunner.ui.components.GitHubMarkIcon
 import com.netrunner.ui.components.GlossyFolderGraphic
 import com.netrunner.ui.components.NetRunnerLogo
 import com.netrunner.ui.components.NetworkAvatarImage
+import com.netrunner.ui.components.rememberPressScaleInteraction
 import com.netrunner.ui.theme.LocalNetRunnerTokens
+import com.netrunner.ui.theme.NetRunnerEase
+
+@Composable
+private fun Modifier.staggeredEntrance(visible: Boolean, delayMillis: Int): Modifier {
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(durationMillis = 360, delayMillis = delayMillis, easing = NetRunnerEase),
+        label = "dashAlpha_$delayMillis",
+    )
+    val offsetY by animateFloatAsState(
+        targetValue = if (visible) 0f else 18f,
+        animationSpec = tween(durationMillis = 420, delayMillis = delayMillis, easing = NetRunnerEase),
+        label = "dashOffset_$delayMillis",
+    )
+    return this.graphicsLayer {
+        this.alpha = alpha
+        this.translationY = offsetY * density
+    }
+}
 
 @Composable
 fun DashboardScreen(
     projects: List<WorkspaceProject>,
-    hasApiToken: Boolean,
-    selectedModel: String,
     currentUser: GitHubUser?,
     userRepos: List<GitHubRepo>,
     onOpenNewProjectModal: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenTokenSettings: () -> Unit,
-    onOpenHybridStudio: () -> Unit,
     onOpenGitHubAuth: () -> Unit,
     onImportGitHubRepo: (GitHubRepo) -> Unit,
     onSelectProject: (WorkspaceProject) -> Unit,
@@ -84,6 +110,11 @@ fun DashboardScreen(
     val tokens = LocalNetRunnerTokens.current
     var searchQuery by remember { mutableStateOf("") }
     var selectedTag by remember { mutableStateOf<String?>(null) }
+    var isVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        isVisible = true
+    }
 
     val filteredProjects = remember(projects, searchQuery, selectedTag) {
         projects.filter { p ->
@@ -122,7 +153,8 @@ fun DashboardScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 2.dp),
+                    .padding(top = 2.dp)
+                    .staggeredEntrance(isVisible, delayMillis = 0),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -165,14 +197,20 @@ fun DashboardScreen(
                                 .clickable { onOpenSettings() },
                         )
                     } else {
+                        val (signInInteraction, signInScale) = rememberPressScaleInteraction(0.95f)
                         Surface(
                             onClick = onOpenGitHubAuth,
+                            interactionSource = signInInteraction,
                             shape = CircleShape,
                             color = if (tokens.isDark) Color.White.copy(alpha = 0.05f) else Color(0xFFF3F4F6),
                             border = BorderStroke(
                                 1.dp,
                                 if (tokens.isDark) Color.White.copy(alpha = 0.10f) else Color(0xFFD4D4D8),
                             ),
+                            modifier = Modifier.graphicsLayer {
+                                scaleX = signInScale
+                                scaleY = signInScale
+                            },
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -193,15 +231,22 @@ fun DashboardScreen(
                         }
                     }
 
+                    val (settingsInteraction, settingsScale) = rememberPressScaleInteraction(0.92f)
                     Surface(
                         onClick = onOpenSettings,
+                        interactionSource = settingsInteraction,
                         shape = CircleShape,
                         color = if (tokens.isDark) Color.White.copy(alpha = 0.05f) else Color(0xFFF3F4F6),
                         border = BorderStroke(
                             1.dp,
                             if (tokens.isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFD4D4D8),
                         ),
-                        modifier = Modifier.size(36.dp),
+                        modifier = Modifier
+                            .size(36.dp)
+                            .graphicsLayer {
+                                scaleX = settingsScale
+                                scaleY = settingsScale
+                            },
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
@@ -218,7 +263,11 @@ fun DashboardScreen(
 
         // 2. Welcome Section
         item {
-            Column(modifier = Modifier.padding(top = 4.dp)) {
+            Column(
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .staggeredEntrance(isVisible, delayMillis = 45),
+            ) {
                 Text(
                     text = "Welcome back,",
                     color = tokens.textSub,
@@ -255,14 +304,26 @@ fun DashboardScreen(
 
         // 3. Action Capsule Button (+ New Project >) & Quick GitHub Import
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .animateContentSize(spring(stiffness = 400f, dampingRatio = 0.82f))
+                    .staggeredEntrance(isVisible, delayMillis = 90),
+            ) {
+                val (newProjInteraction, newProjScale) = rememberPressScaleInteraction(0.975f)
                 Surface(
                     onClick = onOpenNewProjectModal,
+                    interactionSource = newProjInteraction,
                     shape = CircleShape,
                     color = tokens.pillBg,
                     border = BorderStroke(1.dp, tokens.pillBorder),
                     shadowElevation = if (tokens.isDark) 8.dp else 10.dp,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer {
+                            scaleX = newProjScale
+                            scaleY = newProjScale
+                        },
                 ) {
                     Box(
                         modifier = Modifier.background(
@@ -308,15 +369,22 @@ fun DashboardScreen(
 
                 if (currentUser != null && userRepos.isNotEmpty()) {
                     val latestRepo = userRepos.first()
+                    val (importInteraction, importScale) = rememberPressScaleInteraction(0.97f)
                     Surface(
                         onClick = { onImportGitHubRepo(latestRepo) },
+                        interactionSource = importInteraction,
                         shape = CircleShape,
                         color = if (tokens.isDark) Color.White.copy(alpha = 0.05f) else Color.White,
                         border = BorderStroke(
                             1.dp,
                             if (tokens.isDark) Color.White.copy(alpha = 0.10f) else Color(0xFFD4D4D8),
                         ),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                scaleX = importScale
+                                scaleY = importScale
+                            },
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
@@ -348,7 +416,9 @@ fun DashboardScreen(
                 shape = CircleShape,
                 color = tokens.inputBg,
                 border = BorderStroke(1.dp, tokens.inputBorder),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .staggeredEntrance(isVisible, delayMillis = 135),
             ) {
                 Row(
                     modifier = Modifier
@@ -383,13 +453,18 @@ fun DashboardScreen(
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                    if (searchQuery.isNotEmpty()) {
+                    AnimatedVisibility(
+                        visible = searchQuery.isNotEmpty(),
+                        enter = scaleIn(tween(160, easing = NetRunnerEase)) + fadeIn(tween(140)),
+                        exit = scaleOut(tween(140)) + fadeOut(tween(120)),
+                    ) {
                         Icon(
                             imageVector = Icons.Rounded.Close,
                             contentDescription = "Clear search",
                             tint = tokens.textMuted,
                             modifier = Modifier
                                 .size(16.dp)
+                                .clip(CircleShape)
                                 .clickable { searchQuery = "" },
                         )
                     }
@@ -397,130 +472,14 @@ fun DashboardScreen(
             }
         }
 
-        // 5. Quick Access Cards: BYOK AI Token & Hybrid Architecture & CI/CD
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Surface(
-                    onClick = onOpenTokenSettings,
-                    shape = RoundedCornerShape(16.dp),
-                    color = tokens.cardBg,
-                    border = BorderStroke(1.dp, tokens.cardBorder),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(end = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            val badgeTint = if (hasApiToken) Color(0xFF34D399) else Color(0xFFFBBF24)
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(badgeTint.copy(alpha = 0.12f))
-                                    .border(1.dp, badgeTint.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Key,
-                                    contentDescription = null,
-                                    tint = badgeTint,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            }
-                            Column {
-                                Text(
-                                    text = if (hasApiToken) "Personal AI Token Active" else "Add Your AI Token (BYOK)",
-                                    color = tokens.textTitle,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    text = if (hasApiToken) {
-                                        "$selectedModel · Using your own key"
-                                    } else {
-                                        "No free tokens provided · Paste your Gemini key"
-                                    },
-                                    color = tokens.textSub,
-                                    fontSize = 12.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                        Icon(
-                            imageVector = Icons.Rounded.ChevronRight,
-                            contentDescription = null,
-                            tint = tokens.textMuted,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                }
-
-                Surface(
-                    onClick = onOpenHybridStudio,
-                    shape = RoundedCornerShape(16.dp),
-                    color = tokens.cardBg,
-                    border = BorderStroke(1.dp, tokens.cardBorder),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(end = 12.dp),
-                        ) {
-                            Text(
-                                text = "Hybrid Architecture & CI/CD",
-                                color = tokens.textTitle,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = "Kotlin + Jetpack Compose · Rust Daemon · GitHub Actions",
-                                color = tokens.textSub,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.Rounded.ChevronRight,
-                            contentDescription = null,
-                            tint = tokens.textMuted,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                }
-            }
-        }
-
-        // 6. Empty State OR Projects List
+        // 5. Empty State OR Projects List
         if (projects.isEmpty()) {
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 24.dp, bottom = 16.dp),
+                        .padding(top = 30.dp, bottom = 16.dp)
+                        .staggeredEntrance(isVisible, delayMillis = 180),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     GlossyFolderGraphic()
@@ -539,8 +498,10 @@ fun DashboardScreen(
                         textAlign = TextAlign.Center,
                     )
                     Spacer(Modifier.height(22.dp))
+                    val (createInteraction, createScale) = rememberPressScaleInteraction(0.96f)
                     Surface(
                         onClick = onOpenNewProjectModal,
+                        interactionSource = createInteraction,
                         shape = CircleShape,
                         color = if (tokens.isDark) Color.White.copy(alpha = 0.07f) else Color(0xFF171717),
                         border = BorderStroke(
@@ -548,6 +509,10 @@ fun DashboardScreen(
                             if (tokens.isDark) Color.White.copy(alpha = 0.15f) else Color(0xFF171717),
                         ),
                         shadowElevation = 8.dp,
+                        modifier = Modifier.graphicsLayer {
+                            scaleX = createScale
+                            scaleY = createScale
+                        },
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 24.dp, vertical = 11.dp),
@@ -572,7 +537,10 @@ fun DashboardScreen(
             }
         } else {
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.staggeredEntrance(isVisible, delayMillis = 175),
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -589,7 +557,10 @@ fun DashboardScreen(
                             color = tokens.textSub,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
-                            modifier = Modifier.clickable { onResetProjects() },
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable { onResetProjects() }
+                                .padding(horizontal = 4.dp, vertical = 2.dp),
                         )
                     }
 
@@ -602,14 +573,20 @@ fun DashboardScreen(
                         val categories = listOf<String?>(null, "Hybrid", "AI Agent", "Fullstack", "Frontend", "API")
                         categories.forEach { cat ->
                             val isSelected = selectedTag == cat
+                            val (tagInteraction, tagScale) = rememberPressScaleInteraction(0.95f)
                             Surface(
                                 onClick = { selectedTag = cat },
+                                interactionSource = tagInteraction,
                                 shape = RoundedCornerShape(10.dp),
                                 color = when {
                                     isSelected && tokens.isDark -> Color.White
                                     isSelected && !tokens.isDark -> Color(0xFF171717)
                                     tokens.isDark -> Color.White.copy(alpha = 0.05f)
                                     else -> Color(0xFFE5E7EB)
+                                },
+                                modifier = Modifier.graphicsLayer {
+                                    scaleX = tagScale
+                                    scaleY = tagScale
                                 },
                             ) {
                                 Text(
@@ -651,12 +628,24 @@ fun DashboardScreen(
                 }
             } else {
                 items(filteredProjects, key = { it.id }) { proj ->
+                    val (cardInteraction, cardScale) = rememberPressScaleInteraction(0.985f)
                     Surface(
                         onClick = { onSelectProject(proj) },
+                        interactionSource = cardInteraction,
                         shape = RoundedCornerShape(16.dp),
                         color = tokens.cardBg,
                         border = BorderStroke(1.dp, tokens.cardBorder),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .animateItem(
+                                fadeInSpec = tween(260, easing = NetRunnerEase),
+                                fadeOutSpec = tween(180),
+                                placementSpec = spring(stiffness = 420f, dampingRatio = 0.82f),
+                            )
+                            .graphicsLayer {
+                                scaleX = cardScale
+                                scaleY = cardScale
+                            },
                     ) {
                         Row(
                             modifier = Modifier
@@ -698,11 +687,18 @@ fun DashboardScreen(
                             }
 
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                val (openInteraction, openScale) = rememberPressScaleInteraction(0.92f)
                                 Surface(
                                     onClick = { onSelectProject(proj) },
+                                    interactionSource = openInteraction,
                                     shape = RoundedCornerShape(12.dp),
                                     color = if (tokens.isDark) Color.White.copy(alpha = 0.05f) else Color(0xFFF3F4F6),
-                                    modifier = Modifier.size(36.dp),
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .graphicsLayer {
+                                            scaleX = openScale
+                                            scaleY = openScale
+                                        },
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
@@ -713,11 +709,18 @@ fun DashboardScreen(
                                         )
                                     }
                                 }
+                                val (delInteraction, delScale) = rememberPressScaleInteraction(0.92f)
                                 Surface(
                                     onClick = { onDeleteProject(proj.id) },
+                                    interactionSource = delInteraction,
                                     shape = RoundedCornerShape(12.dp),
                                     color = Color(0xFFEF4444).copy(alpha = 0.12f),
-                                    modifier = Modifier.size(36.dp),
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .graphicsLayer {
+                                            scaleX = delScale
+                                            scaleY = delScale
+                                        },
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
