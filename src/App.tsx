@@ -16,6 +16,8 @@ import { BottomDock } from './components/BottomDock';
 import { SettingsModals } from './components/SettingsModals';
 import { NewProjectModal } from './components/NewProjectModal';
 import { GitHubAuthModal } from './components/GitHubAuthModal';
+import { AIChatModal } from './components/AIChatModal';
+import { HybridArchitectureModal } from './components/HybridArchitectureModal';
 import { Toast } from './components/Toast';
 
 import { 
@@ -42,6 +44,9 @@ export default function App() {
   const [activeSettingsModal, setActiveSettingsModal] = useState<SettingsModalType>(null);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [isGitHubAuthOpen, setIsGitHubAuthOpen] = useState(false);
+  const [isHybridStudioOpen, setIsHybridStudioOpen] = useState(false);
+  const [hybridInitialPrompt, setHybridInitialPrompt] = useState<string | null>(null);
+  const [activeProjectWorkspace, setActiveProjectWorkspace] = useState<Project | null>(null);
   const [isRefreshingStats, setIsRefreshingStats] = useState(false);
 
   // Appearance Theme State (Persistent in localStorage)
@@ -67,6 +72,10 @@ export default function App() {
   const [userRepos, setUserRepos] = useState<GitHubRepo[]>(() => {
     const saved = localStorage.getItem('netrunner_github_repos');
     return saved ? JSON.parse(saved) : [];
+  });
+
+  const [githubToken, setGithubToken] = useState<string | null>(() => {
+    return localStorage.getItem('netrunner_github_token');
   });
 
   // Projects State
@@ -241,7 +250,8 @@ export default function App() {
   const handleLoginSuccess = (
     user: GitHubUser,
     stats: GitHubStats,
-    repos: GitHubRepo[]
+    repos: GitHubRepo[],
+    token?: string
   ) => {
     setCurrentUser(user);
     setUserStats(stats);
@@ -249,6 +259,10 @@ export default function App() {
     localStorage.setItem('netrunner_github_user', JSON.stringify(user));
     localStorage.setItem('netrunner_github_stats', JSON.stringify(stats));
     localStorage.setItem('netrunner_github_repos', JSON.stringify(repos));
+    if (token) {
+      setGithubToken(token);
+      localStorage.setItem('netrunner_github_token', token);
+    }
   };
 
   const handleSignOut = async () => {
@@ -260,9 +274,11 @@ export default function App() {
     setCurrentUser(null);
     setUserStats(null);
     setUserRepos([]);
+    setGithubToken(null);
     localStorage.removeItem('netrunner_github_user');
     localStorage.removeItem('netrunner_github_stats');
     localStorage.removeItem('netrunner_github_repos');
+    localStorage.removeItem('netrunner_github_token');
     showToast('Signed out of NetRunner');
     setActiveSettingsModal(null);
   };
@@ -355,14 +371,13 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen w-full transition-colors duration-300 ${
+    <div className={`min-h-screen w-full transition-colors duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] ${
       isDarkMode ? 'bg-[#040507] text-white' : 'bg-[#eaedf2] text-neutral-900'
     } flex flex-col items-center justify-center p-0 sm:p-4 md:p-6 overflow-x-hidden selection:bg-neutral-500/20`}>
       
       {/* Desktop Controls (Frame toggle) */}
       <aside aria-label="Desktop Controls" className="hidden sm:flex items-center justify-between w-full max-w-md mb-3 px-2 text-xs">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           <span className={`font-mono font-medium ${isDarkMode ? 'text-neutral-300' : 'text-neutral-700'}`}>
             NetRunner Workspace
           </span>
@@ -406,7 +421,7 @@ export default function App() {
           isDarkMode 
             ? 'theme-dark border-white/10 sm:shadow-[0_25px_70px_rgba(0,0,0,0.9)]' 
             : 'theme-light border-neutral-200 sm:shadow-[0_20px_50px_rgba(0,0,0,0.08)]'
-        } h-screen flex flex-col overflow-hidden transition-all duration-300`}
+        } h-screen flex flex-col overflow-hidden transition-[border-color,box-shadow,max-width,height,border-radius] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]`}
       >
         {/* Screen Content Viewport */}
         <div className="relative flex-1 w-full h-full overflow-hidden">
@@ -488,6 +503,9 @@ export default function App() {
                   projects={projects}
                   onOpenNewProjectModal={() => setIsNewProjectModalOpen(true)}
                   onOpenSettings={() => setIsSettingsOpen(true)}
+                  onOpenTokenSettings={() => setActiveSettingsModal('models')}
+                  onOpenProjectWorkspace={(proj) => setActiveProjectWorkspace(proj)}
+                  onOpenHybridStudio={() => setIsHybridStudioOpen(true)}
                   onDeleteProject={handleDeleteProject}
                   onShowToast={showToast}
                   currentUser={currentUser}
@@ -541,6 +559,61 @@ export default function App() {
         }}
         onSignOut={handleSignOut}
         isDarkMode={isDarkMode}
+      />
+
+      {/* Project-Scoped Google Gemini AI Workspace */}
+      <AIChatModal
+        isOpen={Boolean(activeProjectWorkspace)}
+        project={activeProjectWorkspace}
+        initialPrompt={hybridInitialPrompt}
+        onClearInitialPrompt={() => setHybridInitialPrompt(null)}
+        onOpenHybridStudio={() => setIsHybridStudioOpen(true)}
+        onClose={() => setActiveProjectWorkspace(null)}
+        onOpenSettings={(modalType) => setActiveSettingsModal(modalType)}
+        onShowToast={showToast}
+        isDarkMode={isDarkMode}
+      />
+
+      {/* Hybrid Architecture Studio (Kotlin + Jetpack Compose UI & Rust Core Daemon) */}
+      <HybridArchitectureModal
+        isOpen={isHybridStudioOpen}
+        onClose={() => setIsHybridStudioOpen(false)}
+        onShowToast={showToast}
+        currentUser={currentUser}
+        userRepos={userRepos}
+        githubToken={githubToken}
+        isDarkMode={isDarkMode}
+        onCreateHybridProject={() => {
+          handleCreateProject({
+            name: 'netrunner-hybrid-core',
+            description: 'Kotlin + Jetpack Compose Android UI with Rust Core Daemon',
+            category: 'Hybrid',
+            architecture: 'hybrid-kotlin-rust',
+            tags: ['Kotlin', 'Compose', 'Rust'],
+          });
+        }}
+        onAskGeminiWithFile={(filePath, content) => {
+          const snippet = content.length > 3500 ? `${content.slice(0, 3500)}\n// ...truncated` : content;
+          const targetProject: Project = activeProjectWorkspace ||
+            projects.find((p) => p.category === 'Hybrid') || {
+              id: `hybrid-${Date.now()}`,
+              name: 'netrunner-hybrid-core',
+              description: 'Kotlin + Jetpack Compose Android UI with Rust Core Daemon',
+              category: 'Hybrid',
+              architecture: 'hybrid-kotlin-rust',
+              updatedAt: 'Just now',
+              status: 'active',
+              filesCount: 13,
+              tags: ['Kotlin', 'Compose', 'Rust'],
+            };
+          if (!projects.some((p) => p.id === targetProject.id)) {
+            setProjects((prev) => [targetProject, ...prev]);
+          }
+          setHybridInitialPrompt(
+            `Review and extend \`native/${filePath}\` for our Hybrid Architecture (Kotlin + Jetpack Compose UI & Rust Core Daemon):\n\n\`\`\`\n${snippet}\n\`\`\``
+          );
+          setActiveProjectWorkspace(targetProject);
+        }}
       />
 
       {/* Floating System Toast */}

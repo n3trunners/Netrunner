@@ -1,16 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   Plus, Search, ChevronRight, Settings, 
-  Trash2, ExternalLink, Github, X 
+  Trash2, ExternalLink, Github, X, Key 
 } from 'lucide-react';
 import { NetRunnerLogo, GlossyFolderGraphic } from './Icons';
 import { Project, GitHubUser, GitHubRepo } from '../types';
+import { BYOK_UPDATED_EVENT, getByokConfig } from '../utils/byok';
 
 interface DashboardViewProps {
   projects: Project[];
   onOpenNewProjectModal: () => void;
   onOpenSettings: () => void;
+  onOpenTokenSettings: () => void;
+  onOpenProjectWorkspace: (project: Project) => void;
+  onOpenHybridStudio: () => void;
   onDeleteProject: (id: string) => void;
   onShowToast: (msg: string) => void;
   currentUser: GitHubUser | null;
@@ -24,6 +28,9 @@ export function DashboardView({
   projects,
   onOpenNewProjectModal,
   onOpenSettings,
+  onOpenTokenSettings,
+  onOpenProjectWorkspace,
+  onOpenHybridStudio,
   onDeleteProject,
   onShowToast,
   currentUser,
@@ -34,6 +41,13 @@ export function DashboardView({
 }: DashboardViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [byokState, setByokState] = useState(() => getByokConfig());
+
+  useEffect(() => {
+    const sync = () => setByokState(getByokConfig());
+    window.addEventListener(BYOK_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(BYOK_UPDATED_EVENT, sync);
+  }, []);
 
   const filteredProjects = projects.filter(p => {
     const matchesSearch = 
@@ -123,7 +137,7 @@ export function DashboardView({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.1 }}
             onClick={onOpenNewProjectModal}
-            className="app-pill-btn rounded-full py-3.5 px-6 flex items-center justify-between font-medium text-sm group cursor-pointer active:scale-[0.98] transition-all"
+            className="app-pill-btn rounded-full py-3.5 px-6 flex items-center justify-between font-medium text-sm group cursor-pointer active:scale-[0.98] transition-all flex-1"
           >
             <div className="flex items-center gap-3">
               <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />
@@ -181,6 +195,52 @@ export function DashboardView({
           </div>
         </motion.div>
 
+        {/* Quick Access Cards: Hybrid Studio & BYOK AI Token */}
+        <div className="space-y-2.5">
+          <button
+            type="button"
+            onClick={onOpenTokenSettings}
+            className="w-full p-4 rounded-2xl app-card transition-all flex items-center justify-between text-left group cursor-pointer"
+          >
+            <div className="flex items-center gap-3 min-w-0 pr-3">
+              <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${
+                byokState.hasToken
+                  ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
+                  : 'bg-amber-500/10 border-amber-500/25 text-amber-400'
+              }`}>
+                <Key className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-semibold text-sm app-text-title truncate">
+                  {byokState.hasToken ? 'Personal AI Token Active' : 'Add Your AI Token (BYOK)'}
+                </div>
+                <div className="text-xs app-text-sub mt-0.5 truncate">
+                  {byokState.hasToken
+                    ? `${byokState.model} · Using your own key`
+                    : 'No free tokens provided · Paste your Gemini key'}
+                </div>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 app-text-muted group-hover:translate-x-0.5 transition-transform shrink-0" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenHybridStudio}
+            className="w-full p-4 rounded-2xl app-card transition-all flex items-center justify-between text-left group cursor-pointer"
+          >
+            <div className="min-w-0 pr-3">
+              <div className="font-semibold text-sm app-text-title truncate">
+                Hybrid Architecture & CI/CD
+              </div>
+              <div className="text-xs app-text-sub mt-0.5 truncate">
+                Kotlin + Jetpack Compose · Rust Daemon · GitHub Actions
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 app-text-muted group-hover:translate-x-0.5 transition-transform shrink-0" />
+          </button>
+        </div>
+
         {/* Main Content Area: Empty State OR Projects List */}
         {projects.length === 0 ? (
           /* Empty State - Matching Image 1 perfectly */
@@ -232,7 +292,7 @@ export function DashboardView({
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
               <button
                 onClick={() => setSelectedTag(null)}
-                className={`px-3 py-1 rounded-full transition-colors whitespace-nowrap cursor-pointer ${
+                className={`px-3 py-1 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                   selectedTag === null 
                     ? (isDarkMode ? 'bg-white text-black font-semibold' : 'bg-neutral-900 text-white font-semibold')
                     : (isDarkMode ? 'bg-white/5 text-neutral-400 hover:text-white' : 'bg-neutral-200 text-neutral-700 hover:text-black')
@@ -240,11 +300,11 @@ export function DashboardView({
               >
                 All
               </button>
-              {['AI Agent', 'Fullstack', 'Frontend', 'API'].map(cat => (
+              {['Hybrid', 'AI Agent', 'Fullstack', 'Frontend', 'API'].map(cat => (
                 <button
                   key={cat}
                   onClick={() => setSelectedTag(cat)}
-                  className={`px-3 py-1 rounded-full transition-colors whitespace-nowrap cursor-pointer ${
+                  className={`px-3 py-1 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                     selectedTag === cat 
                       ? (isDarkMode ? 'bg-white text-black font-semibold' : 'bg-neutral-900 text-white font-semibold')
                       : (isDarkMode ? 'bg-white/5 text-neutral-400 hover:text-white' : 'bg-neutral-200 text-neutral-700 hover:text-black')
@@ -268,32 +328,30 @@ export function DashboardView({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="p-4 rounded-2xl app-card transition-all flex items-center justify-between group"
+                    onClick={() => onOpenProjectWorkspace(proj)}
+                    className="p-4 rounded-2xl app-card transition-all flex items-center justify-between group cursor-pointer"
                   >
                     <div className="space-y-1 pr-3 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-[15px] truncate app-text-title">{proj.name}</span>
-                        <span className={`text-[10px] uppercase font-mono px-2 py-0.5 rounded-full shrink-0 ${
-                          isDarkMode ? 'bg-white/10 text-white/80' : 'bg-neutral-100 text-neutral-800 border border-neutral-200'
-                        }`}>
-                          {proj.category}
-                        </span>
+                      <div className="font-semibold text-[15px] truncate app-text-title">
+                        {proj.name}
                       </div>
                       <p className="text-xs app-text-sub line-clamp-1">{proj.description}</p>
-                      <div className="flex items-center gap-3 text-[11px] app-text-muted font-mono pt-1">
+                      <div className="flex items-center gap-2 text-[11px] app-text-muted font-mono tabular-nums pt-1">
+                        <span>{proj.category}</span>
+                        <span aria-hidden="true">·</span>
                         <span>Updated {proj.updatedAt}</span>
-                        <span>•</span>
+                        <span aria-hidden="true">·</span>
                         <span>{proj.filesCount} modules</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={() => onShowToast(`Active workspace runner: ${proj.name}`)}
+                        onClick={() => onOpenProjectWorkspace(proj)}
                         className={`p-2 rounded-xl transition-colors cursor-pointer ${
                           isDarkMode ? 'bg-white/5 hover:bg-white/15 text-neutral-300' : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
                         }`}
-                        title="Open Project"
+                        title="Open Project Workspace"
                       >
                         <ExternalLink className="w-4 h-4" />
                       </button>

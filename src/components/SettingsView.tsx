@@ -110,8 +110,8 @@ export function SettingsView({
 
             <SettingRow
               icon={<Box className="w-5 h-5" />}
-              title="Models"
-              subtitle="Manage and configure AI models"
+              title="Models & API Token"
+              subtitle="Bring your own token & choose AI models"
               onClick={() => onOpenModal('models')}
               isDarkMode={isDarkMode}
             />
@@ -145,8 +145,9 @@ export function SettingsView({
             {/* Appearance with Working Dark/Light Toggle pill */}
             <div className="w-full p-3.5 rounded-2xl app-card flex items-center justify-between">
               <div className="flex items-center gap-3.5">
-                <div className="app-text-title">
-                  {isDarkMode ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                <div className="relative w-5 h-5 app-text-title">
+                  <Moon className={`w-5 h-5 absolute inset-0 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${isDarkMode ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 -rotate-45 scale-75'}`} />
+                  <Sun className={`w-5 h-5 absolute inset-0 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${!isDarkMode ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 rotate-45 scale-75'}`} />
                 </div>
                 <div>
                   <div className="font-semibold text-[15px] app-text-title">Appearance</div>
@@ -158,7 +159,7 @@ export function SettingsView({
               <button
                 type="button"
                 onClick={onToggleTheme}
-                className={`relative flex items-center border rounded-full p-1 cursor-pointer transition-colors duration-300 shadow-inner ${
+                className={`relative flex items-center border rounded-full p-1 cursor-pointer transition-colors duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] shadow-inner ${
                   isDarkMode 
                     ? 'bg-[#15171d] border-white/12 hover:border-white/25' 
                     : 'bg-neutral-200/80 border-neutral-300 hover:border-neutral-400'
@@ -166,22 +167,22 @@ export function SettingsView({
                 aria-label="Toggle dark/light mode"
               >
                 <motion.div
-                  className={`absolute top-1 bottom-1 w-7 h-7 rounded-full shadow-md ${
+                  className={`absolute top-1 bottom-1 w-7 h-7 rounded-full shadow-md transition-colors duration-500 ${
                     isDarkMode ? 'bg-white/20' : 'bg-white'
                   }`}
                   animate={{ x: isDarkMode ? 0 : 28 }}
-                  transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                  transition={{ type: "spring", stiffness: 320, damping: 28, mass: 0.9 }}
                 />
 
                 <div 
-                  className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center transition-colors duration-200 ${
+                  className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center transition-colors duration-500 ${
                     isDarkMode ? 'text-white' : 'text-neutral-500'
                   }`}
                 >
                   <Moon className="w-3.5 h-3.5 fill-current" />
                 </div>
                 <div 
-                  className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center transition-colors duration-200 ${
+                  className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center transition-colors duration-500 ${
                     !isDarkMode ? 'text-neutral-900' : 'text-neutral-400'
                   }`}
                 >

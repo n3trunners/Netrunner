@@ -38,7 +38,8 @@ export interface Project {
   id: string;
   name: string;
   description: string;
-  category: 'AI Agent' | 'Fullstack' | 'Mobile' | 'Frontend' | 'API';
+  category: 'Hybrid' | 'AI Agent' | 'Fullstack' | 'Mobile' | 'Frontend' | 'API';
+  architecture?: 'hybrid-kotlin-rust' | 'web' | 'fullstack';
   updatedAt: string;
   tags: string[];
   status: 'active' | 'ready' | 'idle';

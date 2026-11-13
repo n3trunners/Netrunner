@@ -1,0 +1,134 @@
+name: NetRunner CI Build
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-web:
+    name: Build Web & Server
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (lint)
+        run: npm run lint
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Upload web dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: netrunner-web-dist
+          path: dist/
+          retention-days: 14
+
+  check-rust-core:
+    name: Check & Test Rust Core
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            native/rust-core/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('native/rust-core/Cargo.toml') }}
+
+      - name: Run cargo check
+        working-directory: native/rust-core
+        run: cargo check --all-targets
+
+      - name: Run cargo test
+        working-directory: native/rust-core
+        run: cargo test
+
+  build-android-apk:
+    name: Build Hybrid Android APK (Kotlin + Rust ARM64)
+    runs-on: ubuntu-latest
+    needs: check-rust-core
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK 28.2 & Platform 36
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;35.0.0" "ndk;28.2.13676358"
+
+      - name: Setup Rust & cargo-ndk
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Compile Rust Core for ARM64 (16 KB ELF alignment)
+        working-directory: native/rust-core
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/28.2.13676358
+          RUSTFLAGS: "-C link-arg=-Wl,-z,max-page-size=16384"
+        run: |
+          cargo ndk -t arm64-v8a --platform 28 \
+            -o ../android-compose/app/src/main/jniLibs \
+            build --release
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Build Android Debug APK
+        working-directory: native/android-compose
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Upload Android ARM64 APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: netrunner-android-arm64-apk
+          path: native/android-compose/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14

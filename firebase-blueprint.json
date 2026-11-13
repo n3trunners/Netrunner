@@ -26,6 +26,7 @@
         "name": { "type": "string", "maxLength": 128 },
         "description": { "type": "string", "maxLength": 500 },
         "category": { "type": "string", "maxLength": 64 },
+        "architecture": { "type": "string", "maxLength": 64 },
         "tags": { "type": "array" },
         "status": { "type": "string", "maxLength": 32 },
         "filesCount": { "type": "number" },

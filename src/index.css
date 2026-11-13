@@ -2,31 +2,39 @@
 
 @layer base {
   body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    transition: background-color 0.5s cubic-bezier(0.16, 1, 0.3, 1), color 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: background-color 0.65s cubic-bezier(0.22, 1, 0.36, 1), color 0.55s cubic-bezier(0.22, 1, 0.36, 1);
   }
 }
 
-/* Base Theme Containers with smooth transition */
+/* Base Theme Containers with butter-smooth transition */
+.theme-dark,
+.theme-light {
+  position: relative;
+  isolation: isolate;
+  transition:
+    background-color 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 .theme-dark {
   background-color: #060709;
   color: #f3f4f6;
-  position: relative;
-  transition: background-color 0.5s cubic-bezier(0.16, 1, 0.3, 1), color 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .theme-light {
   background-color: #f4f5f8;
   color: #0f172a;
-  position: relative;
-  transition: background-color 0.5s cubic-bezier(0.16, 1, 0.3, 1), color 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Smooth cross-fading wallpaper layer */
-.theme-dark::before {
+/* Persistent Dual Wallpaper Layers for true GPU opacity cross-fade */
+.theme-dark::before,
+.theme-light::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -34,40 +42,65 @@
   background-size: cover;
   background-position: top center;
   background-repeat: no-repeat;
-  opacity: 1;
-  transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.68s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity;
   pointer-events: none;
   z-index: 0;
+}
+
+.theme-dark::before {
+  opacity: 1;
 }
 
 .theme-light::before {
+  opacity: 0;
+}
+
+.theme-dark::after,
+.theme-light::after {
   content: '';
   position: absolute;
   inset: 0;
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(226, 232, 240, 0.8) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(220, 228, 240, 0.7) 0px, transparent 50%),
+  background-image:
+    radial-gradient(at 0% 0%, rgba(226, 232, 240, 0.85) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(220, 228, 240, 0.75) 0px, transparent 50%),
     linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
-  opacity: 1;
-  transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.68s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity;
   pointer-events: none;
   z-index: 0;
 }
 
-/* Themed classes with smooth animations */
-.app-card, 
-.app-pill-btn, 
-.app-dock-bar, 
-.app-input, 
-.app-divider, 
-.app-text-title, 
-.app-text-sub, 
+.theme-dark::after {
+  opacity: 0;
+}
+
+.theme-light::after {
+  opacity: 1;
+}
+
+/* Ensure viewport content sits cleanly above both cross-fading wallpaper layers */
+.theme-dark > *,
+.theme-light > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Themed classes with butter-smooth color/surface interpolation */
+.app-card,
+.app-pill-btn,
+.app-dock-bar,
+.app-input,
+.app-divider,
+.app-text-title,
+.app-text-sub,
 .app-text-muted {
-  transition: background-color 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-              background 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-              color 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .theme-dark .app-text-title { color: #ffffff; }
@@ -76,33 +109,35 @@
 .theme-dark .app-divider { background-color: rgba(255, 255, 255, 0.15); }
 
 .theme-dark .app-card {
-  background: rgba(255, 255, 255, 0.035);
+  background-color: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.25);
 }
 .theme-dark .app-card:hover {
-  background: rgba(255, 255, 255, 0.065);
+  background-color: rgba(255, 255, 255, 0.065);
   border-color: rgba(255, 255, 255, 0.15);
 }
 
 .theme-dark .app-pill-btn {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+  background-color: rgba(255, 255, 255, 0.06);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0) 100%);
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: #ffffff;
   box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.15), 0 4px 20px -2px rgba(0, 0, 0, 0.5);
 }
 .theme-dark .app-pill-btn:hover {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 100%);
+  background-color: rgba(255, 255, 255, 0.11);
   border-color: rgba(255, 255, 255, 0.25);
 }
 
 .theme-dark .app-dock-bar {
-  background: rgba(14, 16, 20, 0.85);
+  background-color: rgba(14, 16, 20, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7);
 }
 
 .theme-dark .app-input {
-  background: rgba(255, 255, 255, 0.04);
+  background-color: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #ffffff;
 }
@@ -114,34 +149,35 @@
 .theme-light .app-divider { background-color: rgba(0, 0, 0, 0.12); }
 
 .theme-light .app-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background-color: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(226, 232, 240, 0.95);
   box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
 }
 .theme-light .app-card:hover {
-  background: #ffffff;
+  background-color: rgba(255, 255, 255, 1);
   border-color: #cbd5e1;
   box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.08);
 }
 
 .theme-light .app-pill-btn {
-  background: #090a0f;
+  background-color: #090a0f;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0) 100%);
   border: 1px solid #090a0f;
   color: #ffffff;
-  box-shadow: 0 6px 20px -2px rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12), 0 6px 20px -2px rgba(0, 0, 0, 0.2);
 }
 .theme-light .app-pill-btn:hover {
-  background: #1e222e;
+  background-color: #1e222e;
 }
 
 .theme-light .app-dock-bar {
-  background: rgba(255, 255, 255, 0.9);
+  background-color: rgba(255, 255, 255, 0.9);
   border: 1px solid #e2e8f0;
   box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.12);
 }
 
 .theme-light .app-input {
-  background: #ffffff;
+  background-color: rgba(255, 255, 255, 0.95);
   border: 1px solid #e2e8f0;
   color: #090a0f;
 }

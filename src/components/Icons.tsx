@@ -14,10 +14,16 @@ export function NetRunnerLogo({
       <img 
         src="/assets/aistudio/Untitled9_20261108121101_fc9e593c.png" 
         alt={alt}
-        className={`w-full h-full object-contain select-none pointer-events-none transition-all ${
-          isDark 
-            ? '[filter:invert(1)] [mix-blend-mode:screen]' 
-            : '[mix-blend-mode:multiply]'
+        className={`w-full h-full object-contain select-none pointer-events-none [filter:invert(1)] [mix-blend-mode:screen] transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          isDark ? 'opacity-100' : 'opacity-0'
+        }`}
+      />
+      <img 
+        src="/assets/aistudio/Untitled9_20261108121101_fc9e593c.png" 
+        alt=""
+        aria-hidden="true"
+        className={`absolute inset-0 w-full h-full object-contain select-none pointer-events-none [mix-blend-mode:multiply] transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          isDark ? 'opacity-0' : 'opacity-100'
         }`}
       />
     </div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Plus, Terminal, Code2, Cpu, Globe, ArrowRight } from 'lucide-react';
+import { X, Plus, ArrowRight } from 'lucide-react';
 import { Project } from '../types';
 
 interface NewProjectModalProps {
@@ -10,17 +10,10 @@ interface NewProjectModalProps {
   isDarkMode?: boolean;
 }
 
-const TEMPLATES = [
-  { id: 'ai-agent', name: 'Autonomous Agent', category: 'AI Agent' as const, icon: Cpu, desc: 'Multi-turn reasoning loop with tool execution' },
-  { id: 'fullstack', name: 'Fullstack App', category: 'Fullstack' as const, icon: Terminal, desc: 'Vite React + Express API with live database' },
-  { id: 'frontend', name: 'Cyber Frontend', category: 'Frontend' as const, icon: Code2, desc: 'Tailwind V4 + Motion micro-interactions' },
-  { id: 'api', name: 'Neural API Endpoint', category: 'API' as const, icon: Globe, desc: 'High-throughput low-latency inference router' }
-];
-
 export function NewProjectModal({ isOpen, onClose, onCreateProject, isDarkMode = true }: NewProjectModalProps) {
   const [projectName, setProjectName] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]);
+  const [stack, setStack] = useState<'Hybrid' | 'Fullstack' | 'AI Agent' | 'API'>('Hybrid');
 
   if (!isOpen) return null;
 
@@ -28,11 +21,17 @@ export function NewProjectModal({ isOpen, onClose, onCreateProject, isDarkMode =
     e.preventDefault();
     if (!projectName.trim()) return;
 
+    const isHybrid = stack === 'Hybrid';
     onCreateProject({
       name: projectName.trim(),
-      description: description.trim() || selectedTemplate.desc,
-      category: selectedTemplate.category,
-      tags: [selectedTemplate.category, 'NetRunner', 'v1.0']
+      description:
+        description.trim() ||
+        (isHybrid
+          ? 'Kotlin + Jetpack Compose UI with Rust Core Daemon'
+          : 'NetRunner workspace'),
+      category: stack,
+      architecture: isHybrid ? 'hybrid-kotlin-rust' : 'fullstack',
+      tags: isHybrid ? ['Kotlin', 'Compose', 'Rust'] : ['NetRunner', 'Workspace'],
     });
 
     setProjectName('');
@@ -42,40 +41,95 @@ export function NewProjectModal({ isOpen, onClose, onCreateProject, isDarkMode =
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.94, y: 15 }}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.94, y: 15 }}
-          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-          className={`relative w-full max-w-md rounded-3xl border shadow-2xl overflow-hidden transition-colors ${
-            isDarkMode 
-              ? 'bg-[#0c0e12] border-white/12 text-white' 
-              : 'bg-white border-neutral-200 text-neutral-900 shadow-xl'
+          exit={{ opacity: 0, scale: 0.95, y: 12 }}
+          transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+          className={`relative w-full max-w-sm rounded-3xl border backdrop-blur-2xl overflow-hidden transition-colors duration-500 ${
+            isDarkMode
+              ? 'bg-[#0e1118]/75 border-white/15 text-white shadow-[0_24px_64px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.14)]'
+              : 'bg-white/75 border-white/80 text-neutral-900 shadow-[0_24px_60px_rgba(15,23,42,0.14),inset_0_1px_0_rgba(255,255,255,0.9)]'
           }`}
         >
+          {/* Subtle Top Glass Specular Rim */}
+          <div
+            className={`pointer-events-none absolute inset-x-0 top-0 h-px ${
+              isDarkMode
+                ? 'bg-gradient-to-r from-transparent via-white/30 to-transparent'
+                : 'bg-gradient-to-r from-transparent via-white to-transparent'
+            }`}
+          />
+
           {/* Header */}
           <div className={`flex items-center justify-between px-6 py-4 border-b ${
-            isDarkMode ? 'border-white/10 bg-white/[0.02]' : 'border-neutral-100 bg-neutral-50'
+            isDarkMode ? 'border-white/10 bg-white/[0.03]' : 'border-neutral-200/70 bg-white/40'
           }`}>
-            <div className="flex items-center gap-2">
-              <span className={`p-1 rounded-lg ${isDarkMode ? 'bg-white/10 text-white' : 'bg-neutral-200 text-neutral-800'}`}>
+            <div className="flex items-center gap-2.5">
+              <span className={`p-1.5 rounded-xl border ${
+                isDarkMode
+                  ? 'bg-white/10 border-white/15 text-white'
+                  : 'bg-neutral-900/5 border-neutral-300/60 text-neutral-900'
+              }`}>
                 <Plus className="w-4 h-4" />
               </span>
-              <h3 className="font-semibold tracking-wide text-base">New NetRunner Project</h3>
+              <div>
+                <h3 className="font-semibold tracking-tight text-sm">New Project</h3>
+                <p className={`text-[11px] ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                  Initialize a clean workspace
+                </p>
+              </div>
             </div>
-            <button 
+            <button
+              type="button"
               onClick={onClose}
               className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                isDarkMode ? 'text-neutral-400 hover:text-white hover:bg-white/10' : 'text-neutral-500 hover:text-black hover:bg-neutral-100'
+                isDarkMode ? 'text-neutral-400 hover:text-white hover:bg-white/10' : 'text-neutral-500 hover:text-black hover:bg-black/5'
               }`}
+              aria-label="Close modal"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
 
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            {/* Project Name */}
+            <div>
+              <label className={`block text-xs font-medium mb-1.5 ${isDarkMode ? 'text-neutral-300' : 'text-neutral-700'}`}>
+                Architecture Stack
+              </label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {(
+                  [
+                    { id: 'Hybrid', label: 'Hybrid (Kotlin + Rust)' },
+                    { id: 'Fullstack', label: 'Fullstack Web' },
+                    { id: 'AI Agent', label: 'AI Agent' },
+                    { id: 'API', label: 'API Service' },
+                  ] as const
+                ).map((option) => {
+                  const selected = stack === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setStack(option.id)}
+                      className={`px-3 py-2 rounded-xl border text-xs font-medium transition-colors text-left truncate cursor-pointer ${
+                        selected
+                          ? isDarkMode
+                            ? 'bg-white text-black border-white font-semibold'
+                            : 'bg-neutral-900 text-white border-neutral-900 font-semibold'
+                          : isDarkMode
+                            ? 'bg-white/[0.04] border-white/10 text-neutral-300 hover:bg-white/[0.08]'
+                            : 'bg-white/70 border-neutral-300/80 text-neutral-700 hover:bg-white'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div>
               <label className={`block text-xs font-medium mb-1.5 ${isDarkMode ? 'text-neutral-300' : 'text-neutral-700'}`}>
                 Project Name
@@ -83,74 +137,44 @@ export function NewProjectModal({ isOpen, onClose, onCreateProject, isDarkMode =
               <input
                 type="text"
                 required
+                autoFocus
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
-                placeholder="e.g. Matrix-Neural-Engine"
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none transition-colors ${
-                  isDarkMode 
-                    ? 'bg-white/[0.04] border-white/10 text-white placeholder-neutral-500 focus:border-white/30' 
-                    : 'bg-neutral-50 border-neutral-300 text-neutral-900 placeholder-neutral-400 focus:border-neutral-600'
+                placeholder={stack === 'Hybrid' ? 'e.g. netrunner-android-daemon' : 'e.g. neural-runner'}
+                className={`w-full px-4 py-2.5 rounded-2xl border backdrop-blur-md text-sm focus:outline-none transition-all ${
+                  isDarkMode
+                    ? 'bg-white/[0.06] border-white/12 text-white placeholder-neutral-500 focus:border-white/30 focus:bg-white/[0.09]'
+                    : 'bg-white/80 border-neutral-300/80 text-neutral-900 placeholder-neutral-400 focus:border-neutral-600 focus:bg-white'
                 }`}
               />
             </div>
 
-            {/* Description */}
             <div>
               <label className={`block text-xs font-medium mb-1.5 ${isDarkMode ? 'text-neutral-300' : 'text-neutral-700'}`}>
-                Description (Optional)
+                Description <span className="opacity-50 font-normal">(optional)</span>
               </label>
               <input
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Brief project goal..."
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none transition-colors ${
-                  isDarkMode 
-                    ? 'bg-white/[0.04] border-white/10 text-white placeholder-neutral-500 focus:border-white/30' 
-                    : 'bg-neutral-50 border-neutral-300 text-neutral-900 placeholder-neutral-400 focus:border-neutral-600'
+                placeholder="What are you building?"
+                className={`w-full px-4 py-2.5 rounded-2xl border backdrop-blur-md text-sm focus:outline-none transition-all ${
+                  isDarkMode
+                    ? 'bg-white/[0.06] border-white/12 text-white placeholder-neutral-500 focus:border-white/30 focus:bg-white/[0.09]'
+                    : 'bg-white/80 border-neutral-300/80 text-neutral-900 placeholder-neutral-400 focus:border-neutral-600 focus:bg-white'
                 }`}
               />
             </div>
 
-            {/* Template Selector */}
-            <div>
-              <label className={`block text-xs font-medium mb-2 ${isDarkMode ? 'text-neutral-300' : 'text-neutral-700'}`}>
-                Select Architecture Template
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {TEMPLATES.map((tmpl) => {
-                  const Icon = tmpl.icon;
-                  const isSelected = selectedTemplate.id === tmpl.id;
-                  return (
-                    <div
-                      key={tmpl.id}
-                      onClick={() => setSelectedTemplate(tmpl)}
-                      className={`p-3 rounded-2xl border text-left cursor-pointer transition-all ${
-                        isSelected 
-                          ? (isDarkMode ? 'bg-white/10 border-white/30' : 'bg-neutral-100 border-neutral-400 shadow-sm') 
-                          : (isDarkMode ? 'bg-white/[0.03] border-white/8 hover:bg-white/[0.06]' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100')
-                      }`}
-                    >
-                      <Icon className={`w-4 h-4 mb-1.5 ${
-                        isSelected 
-                          ? (isDarkMode ? 'text-white' : 'text-neutral-900') 
-                          : (isDarkMode ? 'text-neutral-400' : 'text-neutral-500')
-                      }`} />
-                      <div className={`font-medium text-xs ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>{tmpl.name}</div>
-                      <div className="text-[10px] text-neutral-400 line-clamp-1 mt-0.5">{tmpl.desc}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Footer Buttons */}
-            <div className={`pt-3 flex items-center justify-end gap-3 border-t ${isDarkMode ? 'border-white/10' : 'border-neutral-200'}`}>
+            {/* Footer Actions */}
+            <div className={`pt-3 flex items-center justify-end gap-2.5 border-t ${
+              isDarkMode ? 'border-white/10' : 'border-neutral-200/70'
+            }`}>
               <button
                 type="button"
                 onClick={onClose}
                 className={`px-4 py-2 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                  isDarkMode ? 'text-neutral-400 hover:text-white' : 'text-neutral-600 hover:text-black'
+                  isDarkMode ? 'text-neutral-400 hover:text-white hover:bg-white/5' : 'text-neutral-600 hover:text-black hover:bg-black/5'
                 }`}
               >
                 Cancel
@@ -158,11 +182,13 @@ export function NewProjectModal({ isOpen, onClose, onCreateProject, isDarkMode =
               <button
                 type="submit"
                 disabled={!projectName.trim()}
-                className={`px-5 py-2.5 rounded-full text-xs font-semibold disabled:opacity-40 transition-all flex items-center gap-1.5 shadow-md cursor-pointer ${
-                  isDarkMode ? 'bg-white text-black hover:bg-neutral-200' : 'bg-neutral-900 text-white hover:bg-black'
+                className={`px-5 py-2 rounded-full text-xs font-semibold disabled:opacity-40 transition-all flex items-center gap-1.5 shadow-lg cursor-pointer active:scale-[0.98] ${
+                  isDarkMode
+                    ? 'bg-white text-black hover:bg-neutral-200'
+                    : 'bg-neutral-900 text-white hover:bg-black'
                 }`}
               >
-                <span>Initialize Project</span>
+                <span>Create Project</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
