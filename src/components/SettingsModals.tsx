@@ -41,7 +41,7 @@ export function SettingsModals({
         transition={{ duration: 0.18 }}
         onClick={onClose}
         className={`absolute inset-0 z-50 flex items-center justify-center p-4 ${
-          isDarkMode ? 'bg-black/28' : 'bg-slate-900/12'
+          isDarkMode ? 'bg-black/15' : 'bg-slate-900/5'
         }`}
       >
         <motion.div
@@ -50,18 +50,26 @@ export function SettingsModals({
           exit={{ opacity: 0, scale: 0.94, y: 14 }}
           transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
           onClick={(e) => e.stopPropagation()}
-          className={`relative w-full max-w-md max-h-[85vh] flex flex-col rounded-[28px] border backdrop-blur-[28px] backdrop-saturate-150 overflow-hidden transition-colors ${
+          className={`relative w-full max-w-md max-h-[85vh] flex flex-col rounded-[28px] border overflow-hidden transition-colors ${
             isDarkMode
-              ? 'bg-[#0b0f18]/44 border-white/22 text-neutral-200 shadow-[0_32px_90px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.22)]'
-              : 'bg-white/56 border-white/90 text-neutral-800 shadow-[0_28px_72px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.95)]'
+              ? 'bg-[#0a0e17]/32 border-white/25 text-neutral-200 shadow-[0_32px_90px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.28)]'
+              : 'bg-white/36 border-white/80 text-neutral-800 shadow-[0_28px_72px_rgba(15,23,42,0.14),inset_0_1px_0_rgba(255,255,255,0.95)]'
           }`}
         >
-          {/* Top specular edge gleam */}
+          {/* Clear glass diagonal sheen & top specular edge gleam */}
+          <div
+            aria-hidden="true"
+            className={`pointer-events-none absolute inset-0 ${
+              isDarkMode
+                ? 'bg-gradient-to-br from-white/[0.11] via-transparent to-white/[0.03]'
+                : 'bg-gradient-to-br from-white/50 via-transparent to-white/15'
+            }`}
+          />
           <div
             aria-hidden="true"
             className={`pointer-events-none absolute inset-x-6 top-0 h-px ${
               isDarkMode
-                ? 'bg-gradient-to-r from-transparent via-white/45 to-transparent'
+                ? 'bg-gradient-to-r from-transparent via-white/55 to-transparent'
                 : 'bg-gradient-to-r from-transparent via-white to-transparent'
             }`}
           />

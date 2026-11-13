@@ -90,8 +90,12 @@ object GitHubApiClient {
                 return@runCatching if (clientSecret.isNotEmpty()) {
                     val encodedRedirect = URLEncoder.encode("netrunner://auth", "UTF-8")
                     "https://github.com/login/oauth/authorize?client_id=$clientId&redirect_uri=$encodedRedirect&scope=$encodedScope&allow_signup=true&state=$encodedState"
+                } else if (baseUrl.isNotEmpty()) {
+                    val encodedRedirect = URLEncoder.encode("$baseUrl/auth/callback", "UTF-8")
+                    "https://github.com/login/oauth/authorize?client_id=$clientId&redirect_uri=$encodedRedirect&scope=$encodedScope&allow_signup=true&state=$encodedState"
                 } else {
-                    "https://github.com/login/oauth/authorize?client_id=$clientId&scope=$encodedScope&allow_signup=true&state=$encodedState"
+                    val encodedRedirect = URLEncoder.encode("netrunner://auth", "UTF-8")
+                    "https://github.com/login/oauth/authorize?client_id=$clientId&redirect_uri=$encodedRedirect&scope=$encodedScope&allow_signup=true&state=$encodedState"
                 }
             }
 

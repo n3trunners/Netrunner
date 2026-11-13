@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Github, Loader2, AlertCircle } from 'lucide-react';
-import { auth, db } from '../firebase';
-import { doc, setDoc } from 'firebase/firestore';
 import { GitHubUser, GitHubStats, GitHubRepo } from '../types';
 
 interface GitHubAuthModalProps {
@@ -115,18 +113,6 @@ export function GitHubAuthModal({
         }))
       : [];
 
-    if (auth?.currentUser && db) {
-      try {
-        await setDoc(doc(db, 'users', auth.currentUser.uid), {
-          ...userProfile,
-          uid: auth.currentUser.uid,
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      } catch (e) {
-        console.warn('Firestore user doc sync notice:', e);
-      }
-    }
-
     onLoginSuccess(userProfile, stats, formattedRepos, accessToken);
     onShowToast(`Signed in as @${login}! Live stats synchronized.`);
     setIsLoading(false);
@@ -198,7 +184,7 @@ export function GitHubAuthModal({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
           className={`absolute inset-0 z-50 flex items-center justify-center p-4 ${
-            isDarkMode ? 'bg-black/30' : 'bg-slate-900/12'
+            isDarkMode ? 'bg-black/15' : 'bg-slate-900/5'
           }`}
         >
           <motion.div
@@ -206,18 +192,26 @@ export function GitHubAuthModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.94, y: 12 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className={`relative w-full max-w-sm rounded-[28px] p-6 border backdrop-blur-2xl backdrop-saturate-150 overflow-hidden transition-colors ${
+            className={`relative w-full max-w-sm rounded-[28px] p-6 border overflow-hidden transition-colors ${
               isDarkMode
-                ? 'bg-[#0d111a]/48 border-white/20 text-white shadow-[0_28px_80px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.22)]'
-                : 'bg-white/58 border-white/85 text-neutral-900 shadow-[0_24px_64px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.95)]'
+                ? 'bg-[#0b0f18]/32 border-white/25 text-white shadow-[0_28px_80px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.28)]'
+                : 'bg-white/36 border-white/80 text-neutral-900 shadow-[0_24px_64px_rgba(15,23,42,0.14),inset_0_1px_0_rgba(255,255,255,0.95)]'
             }`}
           >
-            {/* Top specular highlight */}
+            {/* Clear glass diagonal sheen & top specular highlight */}
+            <div
+              aria-hidden="true"
+              className={`pointer-events-none absolute inset-0 ${
+                isDarkMode
+                  ? 'bg-gradient-to-br from-white/[0.11] via-transparent to-white/[0.03]'
+                  : 'bg-gradient-to-br from-white/50 via-transparent to-white/15'
+              }`}
+            />
             <div
               aria-hidden="true"
               className={`pointer-events-none absolute inset-x-6 top-0 h-px ${
                 isDarkMode
-                  ? 'bg-gradient-to-r from-transparent via-white/45 to-transparent'
+                  ? 'bg-gradient-to-r from-transparent via-white/55 to-transparent'
                   : 'bg-gradient-to-r from-transparent via-white to-transparent'
               }`}
             />

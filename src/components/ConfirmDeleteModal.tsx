@@ -31,7 +31,7 @@ export function ConfirmDeleteModal({
           transition={{ duration: 0.16 }}
           onClick={onCancel}
           className={`absolute inset-0 z-50 flex items-center justify-center p-5 ${
-            isDarkMode ? 'bg-black/28' : 'bg-slate-900/12'
+            isDarkMode ? 'bg-black/15' : 'bg-slate-900/5'
           }`}
         >
           <motion.div
@@ -40,17 +40,25 @@ export function ConfirmDeleteModal({
             exit={{ opacity: 0, scale: 0.94, y: 10 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             onClick={(e) => e.stopPropagation()}
-            className={`relative w-full max-w-xs rounded-[26px] border backdrop-blur-2xl backdrop-saturate-150 p-5 overflow-hidden ${
+            className={`relative w-full max-w-xs rounded-[26px] border p-5 overflow-hidden ${
               isDarkMode
-                ? 'bg-[#0e121b]/48 border-white/20 text-white shadow-[0_24px_70px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.22)]'
-                : 'bg-white/58 border-white/85 text-neutral-900 shadow-[0_24px_60px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.95)]'
+                ? 'bg-[#0b0f18]/34 border-white/25 text-white shadow-[0_24px_70px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.28)]'
+                : 'bg-white/38 border-white/80 text-neutral-900 shadow-[0_24px_60px_rgba(15,23,42,0.14),inset_0_1px_0_rgba(255,255,255,0.95)]'
             }`}
           >
             <div
               aria-hidden="true"
+              className={`pointer-events-none absolute inset-0 ${
+                isDarkMode
+                  ? 'bg-gradient-to-br from-white/[0.11] via-transparent to-white/[0.03]'
+                  : 'bg-gradient-to-br from-white/50 via-transparent to-white/15'
+              }`}
+            />
+            <div
+              aria-hidden="true"
               className={`pointer-events-none absolute inset-x-6 top-0 h-px ${
                 isDarkMode
-                  ? 'bg-gradient-to-r from-transparent via-white/40 to-transparent'
+                  ? 'bg-gradient-to-r from-transparent via-white/55 to-transparent'
                   : 'bg-gradient-to-r from-transparent via-white to-transparent'
               }`}
             />

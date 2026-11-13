@@ -2,11 +2,8 @@ import { initializeApp, FirebaseApp } from 'firebase/app';
 import {
   getAuth,
   Auth,
-  GithubAuthProvider,
-  signInWithPopup,
   signOut as firebaseSignOut,
   onAuthStateChanged,
-  getAdditionalUserInfo,
   User as FirebaseUser
 } from 'firebase/auth';
 import {
@@ -37,11 +34,6 @@ if (isFirebaseConfigured) {
 }
 
 export { db, auth };
-
-// Configure GitHub Auth Provider
-export const githubProvider = new GithubAuthProvider();
-githubProvider.addScope('read:user');
-githubProvider.addScope('repo');
 
 // Structured Firestore error handler
 export enum OperationType {
@@ -91,5 +83,5 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-export { firebaseSignOut, signInWithPopup, onAuthStateChanged, getAdditionalUserInfo, GithubAuthProvider };
+export { firebaseSignOut, onAuthStateChanged };
 export type { FirebaseUser };

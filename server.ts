@@ -11,6 +11,15 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const APP_URL = process.env.APP_URL || 'https://ais-dev-27eedfzzz5vdywch54hxxg-668765759056.asia-northeast1.run.app';
 
+function resolveRequestBaseUrl(req: Request): string {
+  const protoHeader = (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0]?.trim();
+  const hostHeader = (req.headers['x-forwarded-host'] as string | undefined)?.split(',')[0]?.trim() || req.get('host');
+  if (hostHeader && !hostHeader.startsWith('localhost') && !hostHeader.startsWith('127.0.0.1')) {
+    return `${protoHeader || 'https'}://${hostHeader}`;
+  }
+  return APP_URL;
+}
+
 const DEFAULT_GEMINI_MODEL = 'gemini-4-hydrogen';
 const DEPRECATED_MODELS = new Set([
   'gemini-1.5-flash',
@@ -66,7 +75,7 @@ app.use(express.json({ limit: '2mb' }));
 // 1. Get GitHub OAuth Authorization URL
 app.get('/api/auth/github/url', (req, res) => {
   const clientId = process.env.GITHUB_CLIENT_ID;
-  const redirectUri = `${APP_URL}/auth/callback`;
+  const redirectUri = `${resolveRequestBaseUrl(req)}/auth/callback`;
   const platform = typeof req.query.platform === 'string' ? req.query.platform : 'web';
 
   if (!clientId) {
@@ -143,7 +152,7 @@ const handleOAuthCallback: RequestHandler = async (req, res) => {
         client_id: clientId,
         client_secret: clientSecret,
         code,
-        redirect_uri: `${APP_URL}/auth/callback`,
+        redirect_uri: `${resolveRequestBaseUrl(req)}/auth/callback`,
       }),
     });
 

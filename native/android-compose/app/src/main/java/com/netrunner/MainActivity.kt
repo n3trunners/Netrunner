@@ -10,7 +10,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -34,8 +33,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.unit.dp
 import com.netrunner.core.RustDaemonBridge
 import com.netrunner.model.ActiveTab
 import com.netrunner.model.GitHubRepo
@@ -313,24 +310,9 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            val isAnyOverlayOpen = isGitHubAuthOpen ||
-                isNewProjectOpen ||
-                activeSettingsModal != null ||
-                pendingDeleteAction != null
-            val bgBlur by animateDpAsState(
-                targetValue = if (isAnyOverlayOpen) 16.dp else 0.dp,
-                animationSpec = tween(220, easing = NetRunnerEase),
-                label = "overlayBgBlur",
-            )
-
             NetRunnerTheme(darkTheme = isDark) {
-                NetRunnerWallpaperBox(backgroundBlur = bgBlur) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .then(if (bgBlur > 0.dp) Modifier.blur(bgBlur) else Modifier),
-                    ) {
-                        AnimatedContent(
+                NetRunnerWallpaperBox {
+                    AnimatedContent(
                             targetState = selectedProject,
                             transitionSpec = {
                                 if (targetState != null) {
@@ -662,7 +644,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
-                    }
                     }
 
                     // Toast Notification

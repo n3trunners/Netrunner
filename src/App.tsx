@@ -388,7 +388,7 @@ export default function App() {
             </span>
           </div>
 
-          <div className={`flex items-center gap-1 p-1 rounded-full border backdrop-blur-md ${
+          <div className={`flex items-center gap-1 p-1 rounded-full border ${
             isDarkMode ? 'bg-white/5 border-white/10 text-neutral-400' : 'bg-white border-neutral-200 text-neutral-600 shadow-sm'
           }`}>
             <button
@@ -555,7 +555,7 @@ export default function App() {
             />
           )}
 
-          {/* Frosted Glassmorphism Overlays Inside Main Viewport (shows NetRunner wallpaper behind blur) */}
+          {/* Clear Glassmorphism Overlays Inside Main Viewport (shows NetRunner background cleanly) */}
           <GitHubAuthModal
             isOpen={isGitHubAuthOpen}
             onClose={() => setIsGitHubAuthOpen(false)}

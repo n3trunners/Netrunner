@@ -19,14 +19,11 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import com.netrunner.app.R
 
 val NetRunnerEase = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
@@ -170,7 +167,6 @@ fun NetRunnerTheme(
 @Composable
 fun NetRunnerWallpaperBox(
     modifier: Modifier = Modifier,
-    backgroundBlur: Dp = 0.dp,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val tokens = LocalNetRunnerTokens.current
@@ -179,11 +175,7 @@ fun NetRunnerWallpaperBox(
             .fillMaxSize()
             .background(tokens.backgroundBase),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(if (backgroundBlur > 0.dp) Modifier.blur(backgroundBlur) else Modifier),
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             Crossfade(
                 targetState = tokens.isDark,
                 animationSpec = tween(durationMillis = 480, easing = NetRunnerThemeEase),

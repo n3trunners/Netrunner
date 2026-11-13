@@ -31,7 +31,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -63,7 +62,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -100,31 +98,48 @@ private fun GlassOverlayContainer(
     val glassBg = if (tokens.isDark) {
         Brush.verticalGradient(
             listOf(
-                Color(0x88141926),
-                Color(0x9C0A0D16),
+                Color(0x52141926),
+                Color(0x660A0D16),
             ),
         )
     } else {
         Brush.verticalGradient(
             listOf(
-                Color(0xC2FFFFFF),
-                Color(0xB3F1F5F9),
+                Color(0x6BFFFFFF),
+                Color(0x57E2E8F0),
+            ),
+        )
+    }
+    val glassSheen = if (tokens.isDark) {
+        Brush.linearGradient(
+            listOf(
+                Color.White.copy(alpha = 0.11f),
+                Color.Transparent,
+                Color.White.copy(alpha = 0.03f),
+            ),
+        )
+    } else {
+        Brush.linearGradient(
+            listOf(
+                Color.White.copy(alpha = 0.48f),
+                Color.Transparent,
+                Color.White.copy(alpha = 0.14f),
             ),
         )
     }
     val glassBorder = if (tokens.isDark) {
         Brush.linearGradient(
             listOf(
-                Color.White.copy(alpha = 0.28f),
-                Color.White.copy(alpha = 0.08f),
-                Color.White.copy(alpha = 0.16f),
+                Color.White.copy(alpha = 0.30f),
+                Color.White.copy(alpha = 0.10f),
+                Color.White.copy(alpha = 0.18f),
             ),
         )
     } else {
         Brush.linearGradient(
             listOf(
                 Color.White,
-                Color(0xFFCBD5E1).copy(alpha = 0.65f),
+                Color(0xFFCBD5E1).copy(alpha = 0.7f),
                 Color.White,
             ),
         )
@@ -139,7 +154,7 @@ private fun GlassOverlayContainer(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
-                    if (tokens.isDark) Color.Black.copy(alpha = 0.28f) else Color(0x280F172A),
+                    if (tokens.isDark) Color.Black.copy(alpha = 0.16f) else Color(0x140F172A),
                 )
                 .statusBarsPadding()
                 .navigationBarsPadding()
@@ -175,32 +190,12 @@ private fun GlassOverlayContainer(
                     )
                     .animateContentSize(spring(stiffness = 380f, dampingRatio = 0.82f)),
             ) {
-                // Soft ambient refraction glow inside the translucent glass
+                // Crisp non-blurred clear glass diagonal sheen
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .blur(36.dp),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(160.dp)
-                            .offset(x = (-32).dp, y = (-32).dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (tokens.isDark) Color(0x2660A5FA) else Color(0x1E3B82F6),
-                            ),
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(140.dp)
-                            .align(Alignment.BottomEnd)
-                            .offset(x = 32.dp, y = 32.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (tokens.isDark) Color(0x2234D399) else Color(0x1A10B981),
-                            ),
-                    )
-                }
+                        .background(glassSheen),
+                )
 
                 // Top specular glass gleam
                 Box(
@@ -212,7 +207,7 @@ private fun GlassOverlayContainer(
                             Brush.horizontalGradient(
                                 listOf(
                                     Color.Transparent,
-                                    Color.White.copy(alpha = if (tokens.isDark) 0.45f else 0.9f),
+                                    Color.White.copy(alpha = if (tokens.isDark) 0.55f else 0.95f),
                                     Color.Transparent,
                                 ),
                             ),
