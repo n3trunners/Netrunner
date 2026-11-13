@@ -104,7 +104,7 @@ fun GitHubMarkIcon(
 
         val bodyPath = Path().apply {
             moveTo(15f * sx, 22f * sy)
-            verticalLineTo(18f * sy)
+            lineTo(15f * sx, 18f * sy)
             cubicTo(15f * sx, 16.8f * sy, 15.1f * sx, 16.1f * sy, 14.5f * sx, 15.5f * sy)
             cubicTo(17.7f * sx, 15.1f * sy, 21f * sx, 13.9f * sy, 21f * sx, 8.5f * sy)
             cubicTo(21f * sx, 7.1f * sy, 20.5f * sx, 5.8f * sy, 19.6f * sx, 4.8f * sy)
@@ -116,7 +116,7 @@ fun GitHubMarkIcon(
             cubicTo(3.5f * sx, 5.8f * sy, 3f * sx, 7.1f * sy, 3f * sx, 8.5f * sy)
             cubicTo(3f * sx, 13.9f * sy, 6.3f * sx, 15.1f * sy, 9.5f * sx, 15.5f * sy)
             cubicTo(9f * sx, 16.1f * sy, 9f * sx, 16.9f * sy, 9f * sx, 18f * sy)
-            verticalLineTo(22f * sy)
+            lineTo(9f * sx, 22f * sy)
         }
         drawPath(
             path = bodyPath,
