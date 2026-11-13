@@ -14,6 +14,7 @@ import { BrowseView } from './components/BrowseView';
 import { ProfileView } from './components/ProfileView';
 import { BottomDock } from './components/BottomDock';
 import { SettingsModals } from './components/SettingsModals';
+import { SettingsSubPageView, IntegrationSubPageType } from './components/SettingsSubPageView';
 import { NewProjectModal } from './components/NewProjectModal';
 import { GitHubAuthModal } from './components/GitHubAuthModal';
 import { AIChatModal } from './components/AIChatModal';
@@ -40,6 +41,7 @@ export default function App() {
   // Navigation & Screen State
   const [activeTab, setActiveTab] = useState<ActiveTab>('home');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [activeSettingsSubPage, setActiveSettingsSubPage] = useState<IntegrationSubPageType | null>(null);
   const [activeSettingsModal, setActiveSettingsModal] = useState<SettingsModalType>(null);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [isGitHubAuthOpen, setIsGitHubAuthOpen] = useState(false);
@@ -423,7 +425,23 @@ export default function App() {
         {/* Screen Content Viewport */}
         <div className="relative flex-1 w-full h-full overflow-hidden">
           <AnimatePresence mode="wait">
-            {isSettingsOpen ? (
+            {activeSettingsSubPage ? (
+              <motion.div
+                key={`settings-sub-${activeSettingsSubPage}`}
+                initial={{ opacity: 0, x: 25 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -25 }}
+                transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+                className="w-full h-full"
+              >
+                <SettingsSubPageView
+                  pageType={activeSettingsSubPage}
+                  onBack={() => setActiveSettingsSubPage(null)}
+                  onShowToast={showToast}
+                  isDarkMode={isDarkMode}
+                />
+              </motion.div>
+            ) : isSettingsOpen ? (
               /* Settings View */
               <motion.div
                 key="settings"
@@ -435,7 +453,18 @@ export default function App() {
               >
                 <SettingsView
                   onBack={() => setIsSettingsOpen(false)}
-                  onOpenModal={(modal) => setActiveSettingsModal(modal)}
+                  onOpenModal={(modal) => {
+                    if (
+                      modal === 'connectors' ||
+                      modal === 'models' ||
+                      modal === 'agents' ||
+                      modal === 'skills'
+                    ) {
+                      setActiveSettingsSubPage(modal);
+                    } else {
+                      setActiveSettingsModal(modal);
+                    }
+                  }}
                   isDarkMode={isDarkMode}
                   onToggleTheme={() => {
                     const next = !isDarkMode;
@@ -515,7 +544,7 @@ export default function App() {
         </div>
 
         {/* Bottom Floating Navigation Dock */}
-        {!isSettingsOpen && (
+        {!isSettingsOpen && !activeSettingsSubPage && (
           <BottomDock
             activeTab={activeTab}
             onChangeTab={(tab) => {
@@ -561,7 +590,11 @@ export default function App() {
         isOpen={Boolean(activeProjectWorkspace)}
         project={activeProjectWorkspace}
         onClose={() => setActiveProjectWorkspace(null)}
-        onOpenSettings={(modalType) => setActiveSettingsModal(modalType)}
+        onOpenSettings={(modalType) => {
+          setActiveProjectWorkspace(null);
+          setIsSettingsOpen(true);
+          setActiveSettingsSubPage(modalType);
+        }}
         onShowToast={showToast}
         isDarkMode={isDarkMode}
       />

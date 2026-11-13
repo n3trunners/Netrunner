@@ -73,7 +73,7 @@ object GitHubApiClient {
     /**
      * Resolves the GitHub OAuth authorize URL for Android:
      * 1) If BuildConfig.GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET are bundled, uses direct mobile deep-link OAuth (netrunner://auth).
-     * 2) If BuildConfig.GITHUB_CLIENT_ID is bundled without secret, routes callback through OAUTH_BASE_URL/auth/callback with android state.
+     * 2) If BuildConfig.GITHUB_CLIENT_ID is bundled without secret, omits redirect_uri so GitHub uses the registered callback URL on the OAuth App.
      * 3) Otherwise fetches the configured OAuth URL from the NetRunner server (/api/auth/github/url?platform=android).
      */
     suspend fun resolveAuthorizeUrl(): Result<String> = withContext(Dispatchers.IO) {
@@ -84,20 +84,19 @@ object GitHubApiClient {
             val nonce = UUID.randomUUID().toString().replace("-", "").take(16)
 
             if (clientId.isNotEmpty()) {
-                val redirectUri = if (clientSecret.isNotEmpty()) {
-                    "netrunner://auth"
-                } else {
-                    "$baseUrl/auth/callback"
-                }
                 val state = "android:$nonce"
-                val encodedRedirect = URLEncoder.encode(redirectUri, "UTF-8")
                 val encodedScope = URLEncoder.encode("read:user,repo", "UTF-8")
                 val encodedState = URLEncoder.encode(state, "UTF-8")
-                return@runCatching "https://github.com/login/oauth/authorize?client_id=$clientId&redirect_uri=$encodedRedirect&scope=$encodedScope&allow_signup=true&state=$encodedState"
+                return@runCatching if (clientSecret.isNotEmpty()) {
+                    val encodedRedirect = URLEncoder.encode("netrunner://auth", "UTF-8")
+                    "https://github.com/login/oauth/authorize?client_id=$clientId&redirect_uri=$encodedRedirect&scope=$encodedScope&allow_signup=true&state=$encodedState"
+                } else {
+                    "https://github.com/login/oauth/authorize?client_id=$clientId&scope=$encodedScope&allow_signup=true&state=$encodedState"
+                }
             }
 
             require(baseUrl.isNotEmpty()) {
-                "GitHub OAuth Client ID is not configured. Provide GITHUB_CLIENT_ID in build config or server environment."
+                "GitHub OAuth Client ID is not configured."
             }
 
             val (code, body) = httpGet("$baseUrl/api/auth/github/url?platform=android")
@@ -151,10 +150,14 @@ object GitHubApiClient {
                         .put("redirectUri", "netrunner://auth")
                     val (status, body) = httpPostJson("$baseUrl/api/auth/github/exchange", payload)
                     val json = runCatching { JSONObject(body) }.getOrNull()
-                    if (status !in 200..299) {
-                        throw IllegalStateException(json?.optString("error")?.ifBlank { null } ?: "Token exchange failed (HTTP $status)")
+                    if (status !in 200..299 || json == null) {
+                        val serverErr = json?.optString("error")?.ifBlank { null }
+                        throw IllegalStateException(
+                            serverErr
+                                ?: "GitHub token exchange failed (HTTP $status). Add GITHUB_CLIENT_SECRET to GitHub Actions Secrets or publish the web server."
+                        )
                     }
-                    json?.optString("access_token")?.takeIf { it.isNotBlank() }
+                    json.optString("access_token").takeIf { it.isNotBlank() }
                         ?: throw IllegalStateException("Server did not return an access token.")
                 }
 

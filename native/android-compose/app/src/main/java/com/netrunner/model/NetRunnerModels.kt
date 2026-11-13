@@ -252,3 +252,44 @@ data class UserCustomIntegration(
         }
     }
 }
+
+@Immutable
+data class SavedApiKeyEntry(
+    val id: String,
+    val provider: String = "gemini-api",
+    val providerLabel: String = "Gemini API",
+    val apiKey: String,
+    val createdAt: String = "Just now",
+) {
+    fun toJson(): JSONObject = JSONObject()
+        .put("id", id)
+        .put("provider", provider)
+        .put("providerLabel", providerLabel)
+        .put("apiKey", apiKey)
+        .put("createdAt", createdAt)
+
+    companion object {
+        fun listToJson(list: List<SavedApiKeyEntry>): String =
+            JSONArray().apply { list.forEach { put(it.toJson()) } }.toString()
+
+        fun listFromJson(raw: String?): List<SavedApiKeyEntry> {
+            if (raw.isNullOrBlank()) return emptyList()
+            return runCatching {
+                val arr = JSONArray(raw)
+                (0 until arr.length()).mapNotNull { idx ->
+                    val o = arr.getJSONObject(idx)
+                    val key = o.optString("apiKey").trim()
+                    if (key.isEmpty()) return@mapNotNull null
+                    SavedApiKeyEntry(
+                        id = o.optString("id").ifBlank { "key-$idx-${System.currentTimeMillis()}" },
+                        provider = o.optString("provider", "gemini-api"),
+                        providerLabel = o.optString("providerLabel", "Gemini API"),
+                        apiKey = key,
+                        createdAt = o.optString("createdAt", "Just now"),
+                    )
+                }
+            }.getOrDefault(emptyList())
+        }
+    }
+}
+

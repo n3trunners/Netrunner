@@ -158,6 +158,52 @@ fun GitHubMarkIcon(
 }
 
 @Composable
+fun DiscordMarkIcon(
+    modifier: Modifier = Modifier,
+    size: Dp = 20.dp,
+    tint: Color = Color(0xFF5865F2),
+    eyeTint: Color = Color.White,
+) {
+    Canvas(modifier = modifier.size(size)) {
+        val sx = this.size.width / 24f
+        val sy = this.size.height / 24f
+
+        val outerPath = Path().apply {
+            moveTo(20.317f * sx, 4.37f * sy)
+            cubicTo(18.8f * sx, 3.67f * sy, 17.16f * sx, 3.16f * sy, 15.432f * sx, 2.855f * sy)
+            cubicTo(15.22f * sx, 3.23f * sy, 14.988f * sx, 3.719f * sy, 14.824f * sx, 4.105f * sy)
+            cubicTo(13.0f * sx, 3.83f * sy, 11.18f * sx, 3.83f * sy, 9.337f * sx, 4.105f * sy)
+            cubicTo(9.17f * sx, 3.719f * sy, 8.93f * sx, 3.23f * sy, 8.72f * sx, 2.855f * sy)
+            cubicTo(6.99f * sx, 3.16f * sy, 5.35f * sx, 3.67f * sy, 3.677f * sx, 4.37f * sy)
+            cubicTo(0.533f * sx, 9.046f * sy, -0.32f * sx, 13.58f * sy, 0.099f * sx, 18.057f * sy)
+            cubicTo(1.88f * sx, 19.37f * sy, 3.92f * sx, 20.43f * sy, 6.092f * sx, 21.087f * sy)
+            cubicTo(6.554f * sx, 20.457f * sy, 6.966f * sx, 19.792f * sy, 7.318f * sx, 19.093f * sy)
+            cubicTo(6.64f * sx, 18.838f * sy, 6.0f * sx, 18.53f * sy, 5.446f * sx, 18.201f * sy)
+            cubicTo(5.60f * sx, 18.08f * sy, 5.75f * sx, 17.96f * sy, 5.818f * sx, 17.909f * sy)
+            cubicTo(9.746f * sx, 19.702f * sy, 14.0f * sx, 19.702f * sy, 17.879f * sx, 17.909f * sy)
+            cubicTo(18.03f * sx, 18.03f * sy, 18.18f * sx, 18.15f * sy, 18.252f * sx, 18.201f * sy)
+            cubicTo(17.69f * sx, 18.53f * sy, 17.05f * sx, 18.838f * sy, 16.379f * sx, 19.093f * sy)
+            cubicTo(16.739f * sx, 19.791f * sy, 17.151f * sx, 20.455f * sy, 17.604f * sx, 21.086f * sy)
+            cubicTo(19.78f * sx, 20.43f * sy, 21.82f * sx, 19.37f * sy, 23.606f * sx, 18.056f * sy)
+            cubicTo(24.106f * sx, 12.879f * sy, 22.768f * sx, 8.382f * sy, 20.317f * sx, 4.37f * sy)
+            close()
+        }
+        drawPath(path = outerPath, color = tint)
+
+        drawCircle(
+            color = eyeTint,
+            radius = 2.0f * sx,
+            center = Offset(8.3f * sx, 13.0f * sy),
+        )
+        drawCircle(
+            color = eyeTint,
+            radius = 2.0f * sx,
+            center = Offset(15.7f * sx, 13.0f * sy),
+        )
+    }
+}
+
+@Composable
 fun NetworkAvatarImage(
     url: String,
     contentDescription: String,

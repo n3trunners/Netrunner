@@ -27,7 +27,7 @@ fun resolveConfigValue(key: String, defaultValue: String = ""): String {
 fun escapeBuildConfig(value: String): String =
     value.replace("\\", "\\\\").replace("\"", "\\\"")
 
-val githubClientId = resolveConfigValue("GITHUB_CLIENT_ID")
+val githubClientId = resolveConfigValue("GITHUB_CLIENT_ID", "Ov23liXctgZr1SlUx5rh")
 val githubClientSecret = resolveConfigValue("GITHUB_CLIENT_SECRET")
 val oauthBaseUrl = resolveConfigValue(
     "OAUTH_BASE_URL",

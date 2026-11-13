@@ -38,6 +38,7 @@ import com.netrunner.model.ActiveTab
 import com.netrunner.model.GitHubRepo
 import com.netrunner.model.GitHubStats
 import com.netrunner.model.GitHubUser
+import com.netrunner.model.SavedApiKeyEntry
 import com.netrunner.model.SettingsModalType
 import com.netrunner.model.UserCustomIntegration
 import com.netrunner.model.WorkspaceProject
@@ -49,6 +50,7 @@ import com.netrunner.ui.NewProjectDialog
 import com.netrunner.ui.ProfileScreen
 import com.netrunner.ui.SettingsDetailDialog
 import com.netrunner.ui.SettingsScreen
+import com.netrunner.ui.SettingsSubPageScreen
 import com.netrunner.ui.WorkspaceTerminalScreen
 import com.netrunner.ui.components.BottomDock
 import com.netrunner.ui.components.ToastBanner
@@ -79,6 +81,7 @@ class MainActivity : ComponentActivity() {
             var isDark by remember { mutableStateOf(prefs.getBoolean("dark_mode", true)) }
             var activeTab by remember { mutableStateOf(ActiveTab.HOME) }
             var isSettingsOpen by remember { mutableStateOf(false) }
+            var activeSettingsSubPage by remember { mutableStateOf<SettingsModalType?>(null) }
             var activeSettingsModal by remember { mutableStateOf<SettingsModalType?>(null) }
             var isNewProjectOpen by remember { mutableStateOf(false) }
             var isGitHubAuthOpen by remember { mutableStateOf(false) }
@@ -90,12 +93,42 @@ class MainActivity : ComponentActivity() {
                 mutableStateOf(prefs.getString("selected_language", "English (US)") ?: "English (US)")
             }
 
-            // BYOK token state
+            // BYOK token state + ordered saved keys list
+            val savedApiKeys = remember {
+                mutableStateListOf<SavedApiKeyEntry>().apply {
+                    val parsed = SavedApiKeyEntry.listFromJson(prefs.getString("saved_api_keys", null))
+                    if (parsed.isNotEmpty()) {
+                        addAll(parsed)
+                    } else {
+                        val legacyKey = prefs.getString("user_api_token", "")?.trim().orEmpty()
+                        if (legacyKey.isNotEmpty()) {
+                            val migrated = SavedApiKeyEntry(
+                                id = "key-migrated-${System.currentTimeMillis()}",
+                                provider = "gemini-api",
+                                providerLabel = "Gemini API",
+                                apiKey = legacyKey,
+                                createdAt = "Saved",
+                            )
+                            add(migrated)
+                            prefs.edit().putString("saved_api_keys", SavedApiKeyEntry.listToJson(this)).apply()
+                        }
+                    }
+                }
+            }
             var userApiToken by remember {
-                mutableStateOf(prefs.getString("user_api_token", "") ?: "")
+                mutableStateOf(savedApiKeys.firstOrNull()?.apiKey ?: prefs.getString("user_api_token", "") ?: "")
             }
             var selectedModel by remember {
                 mutableStateOf(prefs.getString("gemini_model", "gemini-4-hydrogen") ?: "gemini-4-hydrogen")
+            }
+
+            fun persistApiKeys() {
+                val primaryKey = savedApiKeys.firstOrNull()?.apiKey.orEmpty()
+                userApiToken = primaryKey
+                prefs.edit()
+                    .putString("saved_api_keys", SavedApiKeyEntry.listToJson(savedApiKeys))
+                    .putString("user_api_token", primaryKey)
+                    .apply()
             }
 
             // GitHub account state
@@ -235,9 +268,15 @@ class MainActivity : ComponentActivity() {
                 showToast(errMsg)
             }
 
-            BackHandler(enabled = selectedProject != null || isSettingsOpen || activeTab != ActiveTab.HOME) {
+            BackHandler(
+                enabled = selectedProject != null ||
+                    activeSettingsSubPage != null ||
+                    isSettingsOpen ||
+                    activeTab != ActiveTab.HOME,
+            ) {
                 when {
                     selectedProject != null -> selectedProject = null
+                    activeSettingsSubPage != null -> activeSettingsSubPage = null
                     isSettingsOpen -> isSettingsOpen = false
                     activeTab != ActiveTab.HOME -> activeTab = ActiveTab.HOME
                 }
@@ -270,12 +309,18 @@ class MainActivity : ComponentActivity() {
                                 project = activeProj,
                                 userApiToken = userApiToken,
                                 modelId = selectedModel,
-                                onOpenTokenSettings = { activeSettingsModal = SettingsModalType.MODELS },
+                                onOpenTokenSettings = {
+                                    selectedProject = null
+                                    isSettingsOpen = true
+                                    activeSettingsSubPage = SettingsModalType.MODELS
+                                },
                                 onBack = { selectedProject = null },
                             )
                         } else {
                             Box(modifier = Modifier.fillMaxSize()) {
+                                val subPage = activeSettingsSubPage
                                 val routeKey = when {
+                                    subPage != null -> "subpage:${subPage.name}"
                                     isSettingsOpen -> "settings"
                                     activeTab == ActiveTab.BROWSE -> "browse"
                                     activeTab == ActiveTab.PROFILE -> "profile"
@@ -286,6 +331,22 @@ class MainActivity : ComponentActivity() {
                                     targetState = routeKey,
                                     transitionSpec = {
                                         when {
+                                            targetState.startsWith("subpage:") -> {
+                                                (slideInHorizontally(tween(280, easing = NetRunnerEase)) { it / 4 } +
+                                                    fadeIn(tween(240, easing = NetRunnerEase)))
+                                                    .togetherWith(
+                                                        slideOutHorizontally(tween(240, easing = NetRunnerEase)) { -it / 8 } +
+                                                            fadeOut(tween(180)),
+                                                    )
+                                            }
+                                            initialState.startsWith("subpage:") -> {
+                                                (slideInHorizontally(tween(280, easing = NetRunnerEase)) { -it / 8 } +
+                                                    fadeIn(tween(240, easing = NetRunnerEase)))
+                                                    .togetherWith(
+                                                        slideOutHorizontally(tween(240, easing = NetRunnerEase)) { it / 4 } +
+                                                            fadeOut(tween(180)),
+                                                    )
+                                            }
                                             targetState == "settings" -> {
                                                 (slideInHorizontally(tween(280, easing = NetRunnerEase)) { it / 5 } +
                                                     fadeIn(tween(240, easing = NetRunnerEase)))
@@ -314,12 +375,103 @@ class MainActivity : ComponentActivity() {
                                     },
                                     label = "mainRouteAnimatedContent",
                                 ) { key ->
-                                    when (key) {
-                                        "settings" -> SettingsScreen(
+                                    when {
+                                        key.startsWith("subpage:") -> {
+                                            val pageType = SettingsModalType.entries.firstOrNull {
+                                                it.name == key.removePrefix("subpage:")
+                                            } ?: SettingsModalType.MODELS
+                                            SettingsSubPageScreen(
+                                                pageType = pageType,
+                                                savedKeys = savedApiKeys,
+                                                connectors = connectors,
+                                                agents = agents,
+                                                skills = skills,
+                                                onBack = { activeSettingsSubPage = null },
+                                                onSaveNewApiKey = { rawKey ->
+                                                    val entry = SavedApiKeyEntry(
+                                                        id = "key-${System.currentTimeMillis()}",
+                                                        provider = "gemini-api",
+                                                        providerLabel = "Gemini API",
+                                                        apiKey = rawKey.trim(),
+                                                        createdAt = "Saved",
+                                                    )
+                                                    savedApiKeys.add(entry)
+                                                    persistApiKeys()
+                                                    showToast("Gemini API key saved")
+                                                },
+                                                onUpdateApiKey = { id, newKey ->
+                                                    val index = savedApiKeys.indexOfFirst { it.id == id }
+                                                    if (index >= 0) {
+                                                        savedApiKeys[index] = savedApiKeys[index].copy(apiKey = newKey.trim())
+                                                        persistApiKeys()
+                                                        showToast("Gemini API key updated")
+                                                    }
+                                                },
+                                                onDeleteApiKey = { id ->
+                                                    savedApiKeys.removeAll { it.id == id }
+                                                    persistApiKeys()
+                                                    showToast("API key deleted")
+                                                },
+                                                onAddIntegration = { type, name, detail ->
+                                                    val item = UserCustomIntegration(
+                                                        id = "custom-${System.currentTimeMillis()}",
+                                                        name = name,
+                                                        detail = detail,
+                                                    )
+                                                    when (type) {
+                                                        SettingsModalType.CONNECTORS -> {
+                                                            connectors.add(item)
+                                                            prefs.edit().putString("user_connectors", UserCustomIntegration.listToJson(connectors)).apply()
+                                                            showToast("Connector \"$name\" registered")
+                                                        }
+                                                        SettingsModalType.AGENTS -> {
+                                                            agents.add(item)
+                                                            prefs.edit().putString("user_agents", UserCustomIntegration.listToJson(agents)).apply()
+                                                            showToast("Agent \"$name\" initialized")
+                                                        }
+                                                        SettingsModalType.SKILLS -> {
+                                                            skills.add(item)
+                                                            prefs.edit().putString("user_skills", UserCustomIntegration.listToJson(skills)).apply()
+                                                            showToast("Skill \"$name\" installed")
+                                                        }
+                                                        else -> Unit
+                                                    }
+                                                },
+                                                onDeleteIntegration = { type, id ->
+                                                    when (type) {
+                                                        SettingsModalType.CONNECTORS -> {
+                                                            connectors.removeAll { it.id == id }
+                                                            prefs.edit().putString("user_connectors", UserCustomIntegration.listToJson(connectors)).apply()
+                                                        }
+                                                        SettingsModalType.AGENTS -> {
+                                                            agents.removeAll { it.id == id }
+                                                            prefs.edit().putString("user_agents", UserCustomIntegration.listToJson(agents)).apply()
+                                                        }
+                                                        SettingsModalType.SKILLS -> {
+                                                            skills.removeAll { it.id == id }
+                                                            prefs.edit().putString("user_skills", UserCustomIntegration.listToJson(skills)).apply()
+                                                        }
+                                                        else -> Unit
+                                                    }
+                                                    showToast("Removed item")
+                                                },
+                                                onShowToast = ::showToast,
+                                            )
+                                        }
+
+                                        key == "settings" -> SettingsScreen(
                                             currentUser = currentUser,
                                             selectedLanguage = selectedLanguage,
                                             onBack = { isSettingsOpen = false },
-                                            onOpenModal = { activeSettingsModal = it },
+                                            onOpenModal = { modal ->
+                                                when (modal) {
+                                                    SettingsModalType.CONNECTORS,
+                                                    SettingsModalType.MODELS,
+                                                    SettingsModalType.AGENTS,
+                                                    SettingsModalType.SKILLS -> activeSettingsSubPage = modal
+                                                    else -> activeSettingsModal = modal
+                                                }
+                                            },
                                             onToggleTheme = {
                                                 isDark = !isDark
                                                 prefs.edit().putBoolean("dark_mode", isDark).apply()
@@ -331,12 +483,12 @@ class MainActivity : ComponentActivity() {
                                             },
                                         )
 
-                                        "browse" -> BrowseScreen(
+                                        key == "browse" -> BrowseScreen(
                                             onBackToHome = { activeTab = ActiveTab.HOME },
                                             onShowToast = ::showToast,
                                         )
 
-                                        "profile" -> ProfileScreen(
+                                        key == "profile" -> ProfileScreen(
                                             currentUser = currentUser,
                                             userStats = userStats,
                                             userRepos = userRepos,
@@ -426,7 +578,7 @@ class MainActivity : ComponentActivity() {
 
                                 // Floating Bottom Navigation Dock (slides smoothly in/out when Settings opens)
                                 AnimatedVisibility(
-                                    visible = !isSettingsOpen,
+                                    visible = !isSettingsOpen && activeSettingsSubPage == null,
                                     enter = slideInVertically(
                                         animationSpec = spring(stiffness = 380f, dampingRatio = 0.8f),
                                     ) { it } + fadeIn(tween(200)),
@@ -468,17 +620,13 @@ class MainActivity : ComponentActivity() {
                     if (isNewProjectOpen) {
                         NewProjectDialog(
                             onDismiss = { isNewProjectOpen = false },
-                            onCreateProject = { name, desc, cat ->
-                                val isHybrid = cat == "Hybrid"
+                            onCreateProject = { name, desc ->
                                 val created = WorkspaceProject(
                                     id = "proj-${System.currentTimeMillis()}",
                                     name = name,
-                                    description = desc.ifBlank {
-                                        if (isHybrid) "Kotlin + Jetpack Compose UI with Rust Core Daemon"
-                                        else "NetRunner workspace"
-                                    },
-                                    category = cat,
-                                    architecture = if (isHybrid) "hybrid-kotlin-rust" else "fullstack",
+                                    description = desc.ifBlank { "NetRunner workspace" },
+                                    category = "Fullstack",
+                                    architecture = "fullstack",
                                     updatedAt = "Just now",
                                     filesCount = (4..11).random(),
                                 )
@@ -494,73 +642,8 @@ class MainActivity : ComponentActivity() {
                         SettingsDetailDialog(
                             modalType = modalType,
                             currentUser = currentUser,
-                            userApiToken = userApiToken,
-                            selectedModel = selectedModel,
                             selectedLanguage = selectedLanguage,
-                            connectors = connectors,
-                            agents = agents,
-                            skills = skills,
                             onDismiss = { activeSettingsModal = null },
-                            onSaveToken = { token, model ->
-                                userApiToken = token
-                                selectedModel = model
-                                prefs.edit()
-                                    .putString("user_api_token", userApiToken)
-                                    .putString("gemini_model", selectedModel)
-                                    .apply()
-                                showToast(
-                                    if (token.isNotBlank()) "Google AI Studio key saved locally"
-                                    else "Model set to $model",
-                                )
-                            },
-                            onClearToken = {
-                                userApiToken = ""
-                                prefs.edit().remove("user_api_token").apply()
-                                showToast("Personal API token removed")
-                            },
-                            onAddIntegration = { type, name, detail ->
-                                val item = UserCustomIntegration(
-                                    id = "custom-${System.currentTimeMillis()}",
-                                    name = name,
-                                    detail = detail,
-                                )
-                                when (type) {
-                                    SettingsModalType.CONNECTORS -> {
-                                        connectors.add(item)
-                                        prefs.edit().putString("user_connectors", UserCustomIntegration.listToJson(connectors)).apply()
-                                        showToast("Connector \"$name\" registered")
-                                    }
-                                    SettingsModalType.AGENTS -> {
-                                        agents.add(item)
-                                        prefs.edit().putString("user_agents", UserCustomIntegration.listToJson(agents)).apply()
-                                        showToast("Agent \"$name\" initialized")
-                                    }
-                                    SettingsModalType.SKILLS -> {
-                                        skills.add(item)
-                                        prefs.edit().putString("user_skills", UserCustomIntegration.listToJson(skills)).apply()
-                                        showToast("Skill \"$name\" installed")
-                                    }
-                                    else -> Unit
-                                }
-                            },
-                            onDeleteIntegration = { type, id ->
-                                when (type) {
-                                    SettingsModalType.CONNECTORS -> {
-                                        connectors.removeAll { it.id == id }
-                                        prefs.edit().putString("user_connectors", UserCustomIntegration.listToJson(connectors)).apply()
-                                    }
-                                    SettingsModalType.AGENTS -> {
-                                        agents.removeAll { it.id == id }
-                                        prefs.edit().putString("user_agents", UserCustomIntegration.listToJson(agents)).apply()
-                                    }
-                                    SettingsModalType.SKILLS -> {
-                                        skills.removeAll { it.id == id }
-                                        prefs.edit().putString("user_skills", UserCustomIntegration.listToJson(skills)).apply()
-                                    }
-                                    else -> Unit
-                                }
-                                showToast("Removed item")
-                            },
                             onSelectLanguage = { lang ->
                                 selectedLanguage = lang
                                 prefs.edit().putString("selected_language", lang).apply()

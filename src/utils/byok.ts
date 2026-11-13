@@ -8,6 +8,14 @@ export interface ByokConfig {
   hasToken: boolean;
 }
 
+export interface SavedApiKeyEntry {
+  id: string;
+  provider: 'gemini-api';
+  providerLabel: string;
+  apiKey: string;
+  createdAt: string;
+}
+
 export const DEFAULT_GEMINI_MODEL = 'gemini-4-hydrogen';
 
 export const DEPRECATED_GEMINI_MODELS = new Set([
@@ -26,6 +34,7 @@ const STORAGE_KEYS = {
   provider: 'netrunner_ai_provider',
   baseUrl: 'netrunner_ai_base_url',
   model: 'gemini_model',
+  savedKeys: 'netrunner_saved_api_keys',
 };
 
 export const BYOK_UPDATED_EVENT = 'netrunner-byok-updated';
@@ -87,6 +96,81 @@ export function clearByokToken(): ByokConfig {
   localStorage.removeItem(STORAGE_KEYS.apiKey);
   window.dispatchEvent(new Event(BYOK_UPDATED_EVENT));
   return getByokConfig();
+}
+
+export function getSavedApiKeys(): SavedApiKeyEntry[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.savedKeys);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item) => item && typeof item.apiKey === 'string' && item.apiKey.trim().length > 0);
+      }
+    }
+  } catch {
+    // ignore malformed storage
+  }
+  const legacyKey = (localStorage.getItem(STORAGE_KEYS.apiKey) || '').trim();
+  if (legacyKey) {
+    const migrated: SavedApiKeyEntry[] = [
+      {
+        id: `key-${Date.now()}`,
+        provider: 'gemini-api',
+        providerLabel: 'Gemini API',
+        apiKey: legacyKey,
+        createdAt: new Date().toLocaleDateString(),
+      },
+    ];
+    localStorage.setItem(STORAGE_KEYS.savedKeys, JSON.stringify(migrated));
+    return migrated;
+  }
+  return [];
+}
+
+function syncActiveKeyFromList(entries: SavedApiKeyEntry[]) {
+  localStorage.setItem(STORAGE_KEYS.savedKeys, JSON.stringify(entries));
+  const primary = entries[0];
+  if (primary?.apiKey) {
+    saveByokConfig({
+      apiKey: primary.apiKey,
+      provider: 'gemini',
+      model: DEFAULT_GEMINI_MODEL,
+    });
+  } else {
+    clearByokToken();
+  }
+}
+
+export function saveApiKeyEntry(apiKey: string, existingId?: string): SavedApiKeyEntry[] {
+  const trimmed = apiKey.trim();
+  if (!trimmed) return getSavedApiKeys();
+  const current = getSavedApiKeys();
+  let updated: SavedApiKeyEntry[];
+  if (existingId) {
+    updated = current.map((entry) =>
+      entry.id === existingId
+        ? { ...entry, apiKey: trimmed, provider: 'gemini-api', providerLabel: 'Gemini API' }
+        : entry
+    );
+  } else {
+    const entry: SavedApiKeyEntry = {
+      id: `key-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      provider: 'gemini-api',
+      providerLabel: 'Gemini API',
+      apiKey: trimmed,
+      createdAt: new Date().toLocaleDateString(),
+    };
+    updated = [...current, entry];
+  }
+  syncActiveKeyFromList(updated);
+  return updated;
+}
+
+export function deleteApiKeyEntry(id: string): SavedApiKeyEntry[] {
+  const current = getSavedApiKeys();
+  const updated = current.filter((entry) => entry.id !== id);
+  syncActiveKeyFromList(updated);
+  return updated;
 }
 
 export function maskToken(token: string): string {
