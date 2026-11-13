@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, MotionConfig } from 'motion/react';
 import { Smartphone, Monitor } from 'lucide-react';
 
 import { Project, ActiveTab, SettingsModalType, GitHubUser, GitHubStats, GitHubRepo } from './types';
@@ -20,21 +20,19 @@ import { GitHubAuthModal } from './components/GitHubAuthModal';
 import { AIChatModal } from './components/AIChatModal';
 import { Toast } from './components/Toast';
 
-import { 
-  auth, 
-  db, 
-  onAuthStateChanged, 
-  firebaseSignOut, 
-  handleFirestoreError, 
-  OperationType 
+import {
+  auth,
+  db,
+  onAuthStateChanged,
+  firebaseSignOut
 } from './firebase';
-import { 
-  collection, 
-  doc, 
-  setDoc, 
+import {
+  collection,
+  doc,
+  setDoc,
   getDoc,
-  getDocs, 
-  deleteDoc 
+  getDocs,
+  deleteDoc
 } from 'firebase/firestore';
 
 export default function App() {
@@ -97,8 +95,10 @@ export default function App() {
   const fetchLiveGitHubStats = async (login: string, existingUser?: GitHubUser | null) => {
     try {
       const headers: Record<string, string> = { Accept: 'application/vnd.github.v3+json' };
-      
-      // 1. Fetch live user profile directly from GitHub API
+      if (githubToken) {
+        headers.Authorization = `Bearer ${githubToken}`;
+      }
+
       const userRes = await fetch(`https://api.github.com/users/${encodeURIComponent(login)}`, { headers });
       let freshUser = existingUser;
       if (userRes.ok) {
@@ -123,7 +123,6 @@ export default function App() {
         localStorage.setItem('netrunner_github_user', JSON.stringify(freshUser));
       }
 
-      // 2. Fetch live repositories
       const reposRes = await fetch(
         `https://api.github.com/users/${encodeURIComponent(login)}/repos?sort=updated&per_page=30`,
         { headers }
@@ -170,13 +169,12 @@ export default function App() {
     }
   };
 
-  // Firebase Auth State Listener & Firestore Sync
+  // Firebase Auth State Listener & Firestore Sync (only when configured)
   useEffect(() => {
+    if (!auth || !db) return;
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      if (fbUser) {
-        // 1. Try to load saved profile from Firestore
+      if (fbUser && db) {
         let userToUse: GitHubUser | null = currentUser;
-
         try {
           const userDocSnap = await getDoc(doc(db, 'users', fbUser.uid));
           if (userDocSnap.exists()) {
@@ -206,23 +204,10 @@ export default function App() {
           console.warn('Firestore user fetch notice:', err);
         }
 
-        // 2. If not found in Firestore, check localStorage cache
-        if (!userToUse) {
-          const cached = localStorage.getItem('netrunner_github_user');
-          if (cached) {
-            try {
-              userToUse = JSON.parse(cached);
-              setCurrentUser(userToUse);
-            } catch (e) {}
-          }
-        }
-
-        // 3. If we have their real login, fetch fresh live stats immediately
         if (userToUse?.login) {
           fetchLiveGitHubStats(userToUse.login, userToUse);
         }
 
-        // 4. Fetch user projects from Firestore
         try {
           const snapshot = await getDocs(collection(db, 'users', fbUser.uid, 'projects'));
           const cloudProjects: Project[] = [];
@@ -266,7 +251,9 @@ export default function App() {
 
   const handleSignOut = async () => {
     try {
-      await firebaseSignOut(auth);
+      if (auth) {
+        await firebaseSignOut(auth);
+      }
     } catch (e) {
       console.warn('Sign out error:', e);
     }
@@ -295,7 +282,7 @@ export default function App() {
     }
   };
 
-  const handleCreateProject = async (newProjData: Omit<Project, 'id' | 'updatedAt' | 'status' | 'filesCount'>) => {
+  const handleCreateProject = (newProjData: Omit<Project, 'id' | 'updatedAt' | 'status' | 'filesCount'>) => {
     const newProj: Project = {
       ...newProjData,
       id: `proj-${Date.now()}`,
@@ -304,20 +291,21 @@ export default function App() {
       filesCount: Math.floor(Math.random() * 8) + 4
     };
 
-    setProjects(prev => [newProj, ...prev]);
+    const nextProjects = [newProj, ...projects];
+    setProjects(nextProjects);
+    localStorage.setItem('netrunner_projects', JSON.stringify(nextProjects));
+    setIsSettingsOpen(false);
+    setActiveSettingsSubPage(null);
+    setActiveTab('home');
 
-    // Persist to Firestore if user is authenticated
-    if (auth.currentUser) {
-      const projPath = `users/${auth.currentUser.uid}/projects/${newProj.id}`;
-      try {
-        await setDoc(doc(db, 'users', auth.currentUser.uid, 'projects', newProj.id), {
-          ...newProj,
-          ownerId: auth.currentUser.uid,
-          createdAt: new Date().toISOString()
-        });
-      } catch (err) {
+    if (auth?.currentUser && db) {
+      setDoc(doc(db, 'users', auth.currentUser.uid, 'projects', newProj.id), {
+        ...newProj,
+        ownerId: auth.currentUser.uid,
+        createdAt: new Date().toISOString()
+      }).catch((err) => {
         console.warn('Firestore project write warning:', err);
-      }
+      });
     }
 
     showToast(`Project "${newProj.name}" created!`);
@@ -343,7 +331,7 @@ export default function App() {
 
     setProjects(prev => [newProj, ...prev]);
 
-    if (auth.currentUser) {
+    if (auth?.currentUser && db) {
       try {
         await setDoc(doc(db, 'users', auth.currentUser.uid, 'projects', newProj.id), {
           ...newProj,
@@ -359,8 +347,12 @@ export default function App() {
   };
 
   const handleDeleteProject = async (id: string) => {
+    const removed = projects.find(p => p.id === id);
     setProjects(prev => prev.filter(p => p.id !== id));
-    if (auth.currentUser) {
+    if (removed) {
+      showToast(`Deleted ${removed.name}`);
+    }
+    if (auth?.currentUser && db) {
       try {
         await deleteDoc(doc(db, 'users', auth.currentUser.uid, 'projects', id));
       } catch (err) {
@@ -369,238 +361,247 @@ export default function App() {
     }
   };
 
+  const handleResetProjects = () => {
+    const toDelete = [...projects];
+    setProjects([]);
+    localStorage.setItem('netrunner_projects', JSON.stringify([]));
+    showToast('Cleared workspace projects to empty state');
+    if (auth?.currentUser && db) {
+      const uid = auth.currentUser.uid;
+      toDelete.forEach((p) => {
+        deleteDoc(doc(db!, 'users', uid, 'projects', p.id)).catch(() => {});
+      });
+    }
+  };
+
   return (
-    <div className={`min-h-screen w-full transition-colors duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-      isDarkMode ? 'bg-[#040507] text-white' : 'bg-[#eaedf2] text-neutral-900'
-    } flex flex-col items-center justify-center p-0 sm:p-4 md:p-6 overflow-x-hidden selection:bg-neutral-500/20`}>
-      
-      {/* Desktop Controls (Frame toggle) */}
-      <aside aria-label="Desktop Controls" className="hidden sm:flex items-center justify-between w-full max-w-md mb-3 px-2 text-xs">
-        <div className="flex items-center gap-2">
-          <span className={`font-mono font-medium ${isDarkMode ? 'text-neutral-300' : 'text-neutral-700'}`}>
-            NetRunner Workspace
-          </span>
-        </div>
+    <MotionConfig reducedMotion="user">
+      <div className={`min-h-screen w-full transition-colors duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        isDarkMode ? 'bg-[#040507] text-white' : 'bg-[#eaedf2] text-neutral-900'
+      } flex flex-col items-center justify-center p-0 sm:p-4 md:p-6 overflow-x-hidden selection:bg-neutral-500/20`}>
 
-        <div className={`flex items-center gap-1 p-1 rounded-full border backdrop-blur-md ${
-          isDarkMode ? 'bg-white/5 border-white/10 text-neutral-400' : 'bg-white border-neutral-200 text-neutral-600 shadow-sm'
-        }`}>
-          <button
-            onClick={() => setIsDeviceFrame(true)}
-            className={`px-3 py-1 rounded-full flex items-center gap-1.5 transition-all cursor-pointer ${
-              isDeviceFrame 
-                ? (isDarkMode ? 'bg-white/15 text-white shadow-sm' : 'bg-neutral-900 text-white shadow-sm') 
-                : 'hover:text-black'
-            }`}
-          >
-            <Smartphone className="w-3.5 h-3.5" />
-            <span>Mobile Frame</span>
-          </button>
-          <button
-            onClick={() => setIsDeviceFrame(false)}
-            className={`px-3 py-1 rounded-full flex items-center gap-1.5 transition-all cursor-pointer ${
-              !isDeviceFrame 
-                ? (isDarkMode ? 'bg-white/15 text-white shadow-sm' : 'bg-neutral-900 text-white shadow-sm') 
-                : 'hover:text-black'
-            }`}
-          >
-            <Monitor className="w-3.5 h-3.5" />
-            <span>Fluid Canvas</span>
-          </button>
-        </div>
-      </aside>
+        {/* Desktop Controls (Frame toggle) */}
+        <aside aria-label="Desktop Controls" className="hidden sm:flex items-center justify-between w-full max-w-md mb-3 px-2 text-xs">
+          <div className="flex items-center gap-2">
+            <span className={`font-mono font-medium ${isDarkMode ? 'text-neutral-300' : 'text-neutral-700'}`}>
+              NetRunner Workspace
+            </span>
+          </div>
 
-      {/* Main Container - Fully switches between .theme-dark and .theme-light */}
-      <main 
-        className={`relative w-full ${
-          isDeviceFrame 
-            ? 'sm:max-w-[412px] sm:h-[870px] sm:rounded-[36px] sm:border sm:shadow-2xl' 
-            : 'max-w-xl h-screen sm:h-[90vh] sm:rounded-3xl sm:border'
-        } ${
-          isDarkMode 
-            ? 'theme-dark border-white/10 sm:shadow-[0_25px_70px_rgba(0,0,0,0.9)]' 
-            : 'theme-light border-neutral-200 sm:shadow-[0_20px_50px_rgba(0,0,0,0.08)]'
-        } h-screen flex flex-col overflow-hidden transition-[border-color,box-shadow,max-width,height,border-radius] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]`}
-      >
-        {/* Screen Content Viewport */}
-        <div className="relative flex-1 w-full h-full overflow-hidden">
-          <AnimatePresence mode="wait">
-            {activeSettingsSubPage ? (
-              <motion.div
-                key={`settings-sub-${activeSettingsSubPage}`}
-                initial={{ opacity: 0, x: 25 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -25 }}
-                transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-                className="w-full h-full"
-              >
-                <SettingsSubPageView
-                  pageType={activeSettingsSubPage}
-                  onBack={() => setActiveSettingsSubPage(null)}
-                  onShowToast={showToast}
-                  isDarkMode={isDarkMode}
-                />
-              </motion.div>
-            ) : isSettingsOpen ? (
-              /* Settings View */
-              <motion.div
-                key="settings"
-                initial={{ opacity: 0, x: 25 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -25 }}
-                transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-                className="w-full h-full"
-              >
-                <SettingsView
-                  onBack={() => setIsSettingsOpen(false)}
-                  onOpenModal={(modal) => {
-                    if (
-                      modal === 'connectors' ||
-                      modal === 'models' ||
-                      modal === 'agents' ||
-                      modal === 'skills'
-                    ) {
-                      setActiveSettingsSubPage(modal);
-                    } else {
-                      setActiveSettingsModal(modal);
-                    }
-                  }}
-                  isDarkMode={isDarkMode}
-                  onToggleTheme={() => {
-                    const next = !isDarkMode;
-                    setIsDarkMode(next);
-                    showToast(`Switched to ${next ? 'Dark' : 'Light'} appearance`);
-                  }}
-                  currentUser={currentUser}
-                  onOpenGitHubAuth={() => setIsGitHubAuthOpen(true)}
-                />
-              </motion.div>
-            ) : activeTab === 'browse' ? (
-              /* Browse View - "Not available at the moment" */
-              <motion.div
-                key="browse"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                className="w-full h-full"
-              >
-                <BrowseView
-                  onBackToHome={() => setActiveTab('home')}
-                  onShowToast={showToast}
-                  isDarkMode={isDarkMode}
-                />
-              </motion.div>
-            ) : activeTab === 'profile' ? (
-              /* Profile View with Real GitHub Stats */
-              <motion.div
-                key="profile"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                className="w-full h-full"
-              >
-                <ProfileView
-                  onBackToHome={() => setActiveTab('home')}
-                  onOpenSettings={() => setIsSettingsOpen(true)}
-                  onShowToast={showToast}
-                  currentUser={currentUser}
-                  userStats={userStats}
-                  userRepos={userRepos}
-                  onOpenGitHubAuth={() => setIsGitHubAuthOpen(true)}
-                  onSignOut={handleSignOut}
-                  onRefreshStats={handleRefreshStats}
-                  isRefreshing={isRefreshingStats}
-                  isDarkMode={isDarkMode}
-                />
-              </motion.div>
-            ) : (
-              /* Dashboard View */
-              <motion.div
-                key="dashboard"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-                className="w-full h-full"
-              >
-                <DashboardView
-                  projects={projects}
-                  onOpenNewProjectModal={() => setIsNewProjectModalOpen(true)}
-                  onOpenSettings={() => setIsSettingsOpen(true)}
-                  onOpenProjectWorkspace={(proj) => setActiveProjectWorkspace(proj)}
-                  onDeleteProject={handleDeleteProject}
-                  onShowToast={showToast}
-                  currentUser={currentUser}
-                  userRepos={userRepos}
-                  onOpenGitHubAuth={() => setIsGitHubAuthOpen(true)}
-                  onImportGitHubRepo={handleImportGitHubRepo}
-                  isDarkMode={isDarkMode}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+          <div className={`flex items-center gap-1 p-1 rounded-full border backdrop-blur-md ${
+            isDarkMode ? 'bg-white/5 border-white/10 text-neutral-400' : 'bg-white border-neutral-200 text-neutral-600 shadow-sm'
+          }`}>
+            <button
+              onClick={() => setIsDeviceFrame(true)}
+              className={`px-3 py-1 rounded-full flex items-center gap-1.5 transition-all cursor-pointer ${
+                isDeviceFrame
+                  ? (isDarkMode ? 'bg-white/15 text-white shadow-sm' : 'bg-neutral-900 text-white shadow-sm')
+                  : 'hover:text-black'
+              }`}
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>Mobile Frame</span>
+            </button>
+            <button
+              onClick={() => setIsDeviceFrame(false)}
+              className={`px-3 py-1 rounded-full flex items-center gap-1.5 transition-all cursor-pointer ${
+                !isDeviceFrame
+                  ? (isDarkMode ? 'bg-white/15 text-white shadow-sm' : 'bg-neutral-900 text-white shadow-sm')
+                  : 'hover:text-black'
+              }`}
+            >
+              <Monitor className="w-3.5 h-3.5" />
+              <span>Fluid Canvas</span>
+            </button>
+          </div>
+        </aside>
 
-        {/* Bottom Floating Navigation Dock */}
-        {!isSettingsOpen && !activeSettingsSubPage && (
-          <BottomDock
-            activeTab={activeTab}
-            onChangeTab={(tab) => {
-              setActiveTab(tab);
-            }}
+        {/* Main Container */}
+        <main
+          className={`relative w-full ${
+            isDeviceFrame
+              ? 'sm:max-w-[412px] sm:h-[870px] sm:rounded-[36px] sm:border sm:shadow-2xl'
+              : 'max-w-xl h-screen sm:h-[90vh] sm:rounded-3xl sm:border'
+          } ${
+            isDarkMode
+              ? 'theme-dark border-white/10 sm:shadow-[0_25px_70px_rgba(0,0,0,0.9)]'
+              : 'theme-light border-neutral-200 sm:shadow-[0_20px_50px_rgba(0,0,0,0.08)]'
+          } h-screen flex flex-col overflow-hidden transition-[border-color,box-shadow,max-width,height,border-radius] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]`}
+        >
+          {/* Screen Content Viewport */}
+          <div className="relative flex-1 w-full h-full overflow-hidden">
+            <AnimatePresence mode="popLayout" initial={false}>
+              {activeSettingsSubPage ? (
+                <motion.div
+                  key={`settings-sub-${activeSettingsSubPage}`}
+                  initial={{ opacity: 0, x: 24 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 24 }}
+                  transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                  className="w-full h-full"
+                >
+                  <SettingsSubPageView
+                    pageType={activeSettingsSubPage}
+                    onBack={() => setActiveSettingsSubPage(null)}
+                    onShowToast={showToast}
+                    isDarkMode={isDarkMode}
+                  />
+                </motion.div>
+              ) : isSettingsOpen ? (
+                <motion.div
+                  key="settings"
+                  initial={{ opacity: 0, x: 24 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 24 }}
+                  transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                  className="w-full h-full"
+                >
+                  <SettingsView
+                    onBack={() => setIsSettingsOpen(false)}
+                    onOpenModal={(modal) => {
+                      if (
+                        modal === 'connectors' ||
+                        modal === 'models' ||
+                        modal === 'agents' ||
+                        modal === 'skills'
+                      ) {
+                        setActiveSettingsSubPage(modal);
+                      } else {
+                        setActiveSettingsModal(modal);
+                      }
+                    }}
+                    isDarkMode={isDarkMode}
+                    onToggleTheme={() => {
+                      const next = !isDarkMode;
+                      setIsDarkMode(next);
+                      showToast(`Switched to ${next ? 'Dark' : 'Light'} appearance`);
+                    }}
+                    currentUser={currentUser}
+                    onOpenGitHubAuth={() => setIsGitHubAuthOpen(true)}
+                  />
+                </motion.div>
+              ) : activeTab === 'browse' ? (
+                <motion.div
+                  key="browse"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                  className="w-full h-full"
+                >
+                  <BrowseView
+                    onBackToHome={() => setActiveTab('home')}
+                    onShowToast={showToast}
+                    isDarkMode={isDarkMode}
+                  />
+                </motion.div>
+              ) : activeTab === 'profile' ? (
+                <motion.div
+                  key="profile"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                  className="w-full h-full"
+                >
+                  <ProfileView
+                    onBackToHome={() => setActiveTab('home')}
+                    onOpenSettings={() => setIsSettingsOpen(true)}
+                    onShowToast={showToast}
+                    currentUser={currentUser}
+                    userStats={userStats}
+                    userRepos={userRepos}
+                    onOpenGitHubAuth={() => setIsGitHubAuthOpen(true)}
+                    onSignOut={handleSignOut}
+                    onRefreshStats={handleRefreshStats}
+                    isRefreshing={isRefreshingStats}
+                    isDarkMode={isDarkMode}
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="dashboard"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                  className="w-full h-full"
+                >
+                  <DashboardView
+                    projects={projects}
+                    onOpenNewProjectModal={() => setIsNewProjectModalOpen(true)}
+                    onOpenSettings={() => setIsSettingsOpen(true)}
+                    onOpenProjectWorkspace={(proj) => setActiveProjectWorkspace(proj)}
+                    onDeleteProject={handleDeleteProject}
+                    onResetProjects={handleResetProjects}
+                    onShowToast={showToast}
+                    currentUser={currentUser}
+                    userRepos={userRepos}
+                    onOpenGitHubAuth={() => setIsGitHubAuthOpen(true)}
+                    onImportGitHubRepo={handleImportGitHubRepo}
+                    isDarkMode={isDarkMode}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Bottom Floating Navigation Dock */}
+          {!isSettingsOpen && !activeSettingsSubPage && (
+            <BottomDock
+              activeTab={activeTab}
+              onChangeTab={(tab) => setActiveTab(tab)}
+              isDarkMode={isDarkMode}
+            />
+          )}
+
+          {/* Frosted Glassmorphism Overlays Inside Main Viewport (shows NetRunner wallpaper behind blur) */}
+          <GitHubAuthModal
+            isOpen={isGitHubAuthOpen}
+            onClose={() => setIsGitHubAuthOpen(false)}
+            onLoginSuccess={handleLoginSuccess}
+            onShowToast={showToast}
             isDarkMode={isDarkMode}
           />
-        )}
-      </main>
 
-      {/* Streamlined GitHub Auth Card */}
-      <GitHubAuthModal
-        isOpen={isGitHubAuthOpen}
-        onClose={() => setIsGitHubAuthOpen(false)}
-        onLoginSuccess={handleLoginSuccess}
-        onShowToast={showToast}
-        isDarkMode={isDarkMode}
-      />
+          <NewProjectModal
+            isOpen={isNewProjectModalOpen}
+            onClose={() => setIsNewProjectModalOpen(false)}
+            onCreateProject={handleCreateProject}
+            isDarkMode={isDarkMode}
+          />
 
-      {/* Interactive Modals */}
-      <NewProjectModal
-        isOpen={isNewProjectModalOpen}
-        onClose={() => setIsNewProjectModalOpen(false)}
-        onCreateProject={handleCreateProject}
-        isDarkMode={isDarkMode}
-      />
+          <SettingsModals
+            activeModal={activeSettingsModal}
+            onClose={() => setActiveSettingsModal(null)}
+            onShowToast={showToast}
+            currentUser={currentUser}
+            onOpenGitHubAuth={() => {
+              setActiveSettingsModal(null);
+              setIsGitHubAuthOpen(true);
+            }}
+            onSignOut={handleSignOut}
+            isDarkMode={isDarkMode}
+          />
+        </main>
 
-      <SettingsModals
-        activeModal={activeSettingsModal}
-        onClose={() => setActiveSettingsModal(null)}
-        onShowToast={showToast}
-        currentUser={currentUser}
-        onOpenGitHubAuth={() => {
-          setActiveSettingsModal(null);
-          setIsGitHubAuthOpen(true);
-        }}
-        onSignOut={handleSignOut}
-        isDarkMode={isDarkMode}
-      />
+        {/* Project-Scoped Google Gemini AI Workspace */}
+        <AIChatModal
+          isOpen={Boolean(activeProjectWorkspace)}
+          project={activeProjectWorkspace}
+          onClose={() => setActiveProjectWorkspace(null)}
+          onOpenSettings={(modalType) => {
+            setActiveProjectWorkspace(null);
+            setIsSettingsOpen(true);
+            setActiveSettingsSubPage(modalType);
+          }}
+          onShowToast={showToast}
+          isDarkMode={isDarkMode}
+        />
 
-      {/* Project-Scoped Google Gemini AI Workspace */}
-      <AIChatModal
-        isOpen={Boolean(activeProjectWorkspace)}
-        project={activeProjectWorkspace}
-        onClose={() => setActiveProjectWorkspace(null)}
-        onOpenSettings={(modalType) => {
-          setActiveProjectWorkspace(null);
-          setIsSettingsOpen(true);
-          setActiveSettingsSubPage(modalType);
-        }}
-        onShowToast={showToast}
-        isDarkMode={isDarkMode}
-      />
-
-      {/* Floating System Toast */}
-      <Toast message={toastMessage} onClear={() => setToastMessage(null)} />
-    </div>
+        {/* Floating System Toast */}
+        <Toast message={toastMessage} onClear={() => setToastMessage(null)} />
+      </div>
+    </MotionConfig>
   );
 }

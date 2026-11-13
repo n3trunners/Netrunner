@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -33,6 +34,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.unit.dp
 import com.netrunner.core.RustDaemonBridge
 import com.netrunner.model.ActiveTab
 import com.netrunner.model.GitHubRepo
@@ -44,11 +47,12 @@ import com.netrunner.model.UserCustomIntegration
 import com.netrunner.model.WorkspaceProject
 import com.netrunner.network.GitHubApiClient
 import com.netrunner.ui.BrowseScreen
+import com.netrunner.ui.ConfirmDeleteOverlay
 import com.netrunner.ui.DashboardScreen
-import com.netrunner.ui.GitHubAuthDialog
-import com.netrunner.ui.NewProjectDialog
+import com.netrunner.ui.GitHubAuthOverlay
+import com.netrunner.ui.NewProjectOverlay
 import com.netrunner.ui.ProfileScreen
-import com.netrunner.ui.SettingsDetailDialog
+import com.netrunner.ui.SettingsDetailOverlay
 import com.netrunner.ui.SettingsScreen
 import com.netrunner.ui.SettingsSubPageScreen
 import com.netrunner.ui.WorkspaceTerminalScreen
@@ -57,9 +61,18 @@ import com.netrunner.ui.components.ToastBanner
 import com.netrunner.ui.theme.NetRunnerEase
 import com.netrunner.ui.theme.NetRunnerTheme
 import com.netrunner.ui.theme.NetRunnerWallpaperBox
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
+
+private data class PendingDeleteAction(
+    val title: String,
+    val description: String,
+    val confirmLabel: String = "Delete",
+    val onConfirm: () -> Unit,
+)
 
 class MainActivity : ComponentActivity() {
     private var deepLinkTokenState by mutableStateOf<String?>(null)
@@ -69,7 +82,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        RustDaemonBridge.boot(filesDir)
         handleAuthIntent(intent)
 
         val prefs = getSharedPreferences("netrunner_prefs", Context.MODE_PRIVATE)
@@ -87,10 +99,18 @@ class MainActivity : ComponentActivity() {
             var isGitHubAuthOpen by remember { mutableStateOf(false) }
             var isAuthorizingGitHub by remember { mutableStateOf(false) }
             var githubAuthError by remember { mutableStateOf<String?>(null) }
+            var pendingDeleteAction by remember { mutableStateOf<PendingDeleteAction?>(null) }
             var selectedProject by remember { mutableStateOf<WorkspaceProject?>(null) }
             var toastMessage by remember { mutableStateOf<String?>(null) }
             var selectedLanguage by remember {
                 mutableStateOf(prefs.getString("selected_language", "English (US)") ?: "English (US)")
+            }
+
+            // Boot native daemon on IO dispatcher so frame-1 UI renders immediately
+            LaunchedEffect(Unit) {
+                withContext(Dispatchers.IO) {
+                    RustDaemonBridge.boot(filesDir)
+                }
             }
 
             // BYOK token state + ordered saved keys list
@@ -269,12 +289,23 @@ class MainActivity : ComponentActivity() {
             }
 
             BackHandler(
-                enabled = selectedProject != null ||
+                enabled = pendingDeleteAction != null ||
+                    isNewProjectOpen ||
+                    isGitHubAuthOpen ||
+                    activeSettingsModal != null ||
+                    selectedProject != null ||
                     activeSettingsSubPage != null ||
                     isSettingsOpen ||
                     activeTab != ActiveTab.HOME,
             ) {
                 when {
+                    pendingDeleteAction != null -> pendingDeleteAction = null
+                    isNewProjectOpen -> isNewProjectOpen = false
+                    isGitHubAuthOpen -> if (!isAuthorizingGitHub) {
+                        isGitHubAuthOpen = false
+                        githubAuthError = null
+                    }
+                    activeSettingsModal != null -> activeSettingsModal = null
                     selectedProject != null -> selectedProject = null
                     activeSettingsSubPage != null -> activeSettingsSubPage = null
                     isSettingsOpen -> isSettingsOpen = false
@@ -282,28 +313,43 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            val isAnyOverlayOpen = isGitHubAuthOpen ||
+                isNewProjectOpen ||
+                activeSettingsModal != null ||
+                pendingDeleteAction != null
+            val bgBlur by animateDpAsState(
+                targetValue = if (isAnyOverlayOpen) 16.dp else 0.dp,
+                animationSpec = tween(220, easing = NetRunnerEase),
+                label = "overlayBgBlur",
+            )
+
             NetRunnerTheme(darkTheme = isDark) {
-                NetRunnerWallpaperBox {
-                    AnimatedContent(
-                        targetState = selectedProject,
-                        transitionSpec = {
-                            if (targetState != null) {
-                                (slideInHorizontally(tween(280, easing = NetRunnerEase)) { it / 6 } +
-                                    fadeIn(tween(240)))
-                                    .togetherWith(
-                                        scaleOut(targetScale = 0.97f, animationSpec = tween(220)) + fadeOut(tween(180)),
-                                    )
-                            } else {
-                                (scaleIn(initialScale = 0.97f, animationSpec = tween(260, easing = NetRunnerEase)) +
-                                    fadeIn(tween(220)))
-                                    .togetherWith(
-                                        slideOutHorizontally(tween(240, easing = NetRunnerEase)) { it / 6 } +
-                                            fadeOut(tween(180)),
-                                    )
-                            }
-                        },
-                        label = "workspaceTerminalTransition",
-                    ) { activeProj ->
+                NetRunnerWallpaperBox(backgroundBlur = bgBlur) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .then(if (bgBlur > 0.dp) Modifier.blur(bgBlur) else Modifier),
+                    ) {
+                        AnimatedContent(
+                            targetState = selectedProject,
+                            transitionSpec = {
+                                if (targetState != null) {
+                                    (slideInHorizontally(tween(280, easing = NetRunnerEase)) { it / 6 } +
+                                        fadeIn(tween(240)))
+                                        .togetherWith(
+                                            scaleOut(targetScale = 0.97f, animationSpec = tween(220)) + fadeOut(tween(180)),
+                                        )
+                                } else {
+                                    (scaleIn(initialScale = 0.97f, animationSpec = tween(260, easing = NetRunnerEase)) +
+                                        fadeIn(tween(220)))
+                                        .togetherWith(
+                                            slideOutHorizontally(tween(240, easing = NetRunnerEase)) { it / 6 } +
+                                                fadeOut(tween(180)),
+                                        )
+                                }
+                            },
+                            label = "workspaceTerminalTransition",
+                        ) { activeProj ->
                         if (activeProj != null) {
                             WorkspaceTerminalScreen(
                                 project = activeProj,
@@ -455,6 +501,13 @@ class MainActivity : ComponentActivity() {
                                                     }
                                                     showToast("Removed item")
                                                 },
+                                                onRequestDeleteConfirm = { title, description, onConfirm ->
+                                                    pendingDeleteAction = PendingDeleteAction(
+                                                        title = title,
+                                                        description = description,
+                                                        onConfirm = onConfirm,
+                                                    )
+                                                },
                                                 onShowToast = ::showToast,
                                             )
                                         }
@@ -562,15 +615,30 @@ class MainActivity : ComponentActivity() {
                                             },
                                             onSelectProject = { selectedProject = it },
                                             onDeleteProject = { id ->
-                                                val removed = projects.firstOrNull { it.id == id }
-                                                projects.removeAll { it.id == id }
-                                                persistProjects()
-                                                if (removed != null) showToast("Deleted ${removed.name}")
+                                                val target = projects.firstOrNull { it.id == id }
+                                                if (target != null) {
+                                                    pendingDeleteAction = PendingDeleteAction(
+                                                        title = "Delete ${target.name}?",
+                                                        description = "Remove this project from your workspace? This cannot be undone.",
+                                                        onConfirm = {
+                                                            projects.removeAll { it.id == id }
+                                                            persistProjects()
+                                                            showToast("Deleted ${target.name}")
+                                                        },
+                                                    )
+                                                }
                                             },
                                             onResetProjects = {
-                                                projects.clear()
-                                                persistProjects()
-                                                showToast("Cleared workspace projects to empty state")
+                                                pendingDeleteAction = PendingDeleteAction(
+                                                    title = "Reset Workspace?",
+                                                    description = "Delete all ${projects.size} project(s) and reset to the empty state?",
+                                                    confirmLabel = "Reset",
+                                                    onConfirm = {
+                                                        projects.clear()
+                                                        persistProjects()
+                                                        showToast("Cleared workspace projects to empty state")
+                                                    },
+                                                )
                                             },
                                         )
                                     }
@@ -595,6 +663,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                    }
 
                     // Toast Notification
                     ToastBanner(
@@ -604,70 +673,82 @@ class MainActivity : ComponentActivity() {
                             .statusBarsPadding(),
                     )
 
-                    // Modals
-                    if (isGitHubAuthOpen) {
-                        GitHubAuthDialog(
-                            onDismiss = {
-                                isGitHubAuthOpen = false
-                                githubAuthError = null
-                            },
-                            isAuthorizing = isAuthorizingGitHub,
-                            externalError = githubAuthError,
-                            onClearExternalError = { githubAuthError = null },
-                        )
-                    }
+                    // In-window Frosted Glassmorphism Overlays
+                    GitHubAuthOverlay(
+                        visible = isGitHubAuthOpen,
+                        onDismiss = {
+                            isGitHubAuthOpen = false
+                            githubAuthError = null
+                        },
+                        isAuthorizing = isAuthorizingGitHub,
+                        externalError = githubAuthError,
+                        onClearExternalError = { githubAuthError = null },
+                    )
 
-                    if (isNewProjectOpen) {
-                        NewProjectDialog(
-                            onDismiss = { isNewProjectOpen = false },
-                            onCreateProject = { name, desc ->
-                                val created = WorkspaceProject(
-                                    id = "proj-${System.currentTimeMillis()}",
-                                    name = name,
-                                    description = desc.ifBlank { "NetRunner workspace" },
-                                    category = "Fullstack",
-                                    architecture = "fullstack",
-                                    updatedAt = "Just now",
-                                    filesCount = (4..11).random(),
-                                )
-                                projects.add(0, created)
-                                persistProjects()
-                                showToast("Project \"$name\" created!")
-                            },
-                        )
-                    }
+                    NewProjectOverlay(
+                        visible = isNewProjectOpen,
+                        onDismiss = { isNewProjectOpen = false },
+                        onCreateProject = { name, desc ->
+                            val created = WorkspaceProject(
+                                id = "proj-${System.currentTimeMillis()}",
+                                name = name,
+                                description = desc.ifBlank { "NetRunner workspace" },
+                                category = "Fullstack",
+                                architecture = "fullstack",
+                                updatedAt = "Just now",
+                                filesCount = (4..11).random(),
+                            )
+                            projects.add(0, created)
+                            persistProjects()
+                            selectedProject = null
+                            activeSettingsSubPage = null
+                            isSettingsOpen = false
+                            activeTab = ActiveTab.HOME
+                            showToast("Project \"$name\" created!")
+                        },
+                    )
 
-                    val modalType = activeSettingsModal
-                    if (modalType != null) {
-                        SettingsDetailDialog(
-                            modalType = modalType,
-                            currentUser = currentUser,
-                            selectedLanguage = selectedLanguage,
-                            onDismiss = { activeSettingsModal = null },
-                            onSelectLanguage = { lang ->
-                                selectedLanguage = lang
-                                prefs.edit().putString("selected_language", lang).apply()
-                            },
-                            onOpenGitHubAuth = {
-                                githubAuthError = null
-                                isGitHubAuthOpen = true
-                            },
-                            onSignOut = {
-                                currentUser = null
-                                userStats = null
-                                userRepos = emptyList()
-                                githubToken = null
-                                prefs.edit()
-                                    .remove("github_user")
-                                    .remove("github_stats")
-                                    .remove("github_repos")
-                                    .remove("github_token")
-                                    .apply()
-                                showToast("Signed out of NetRunner")
-                            },
-                            onShowToast = ::showToast,
-                        )
-                    }
+                    SettingsDetailOverlay(
+                        modalType = activeSettingsModal,
+                        currentUser = currentUser,
+                        selectedLanguage = selectedLanguage,
+                        onDismiss = { activeSettingsModal = null },
+                        onSelectLanguage = { lang ->
+                            selectedLanguage = lang
+                            prefs.edit().putString("selected_language", lang).apply()
+                        },
+                        onOpenGitHubAuth = {
+                            githubAuthError = null
+                            isGitHubAuthOpen = true
+                        },
+                        onSignOut = {
+                            currentUser = null
+                            userStats = null
+                            userRepos = emptyList()
+                            githubToken = null
+                            prefs.edit()
+                                .remove("github_user")
+                                .remove("github_stats")
+                                .remove("github_repos")
+                                .remove("github_token")
+                                .apply()
+                            showToast("Signed out of NetRunner")
+                        },
+                        onShowToast = ::showToast,
+                    )
+
+                    ConfirmDeleteOverlay(
+                        visible = pendingDeleteAction != null,
+                        title = pendingDeleteAction?.title ?: "Confirm Delete",
+                        description = pendingDeleteAction?.description ?: "",
+                        confirmLabel = pendingDeleteAction?.confirmLabel ?: "Delete",
+                        onCancel = { pendingDeleteAction = null },
+                        onConfirm = {
+                            val action = pendingDeleteAction
+                            pendingDeleteAction = null
+                            action?.onConfirm?.invoke()
+                        },
+                    )
                 }
             }
         }

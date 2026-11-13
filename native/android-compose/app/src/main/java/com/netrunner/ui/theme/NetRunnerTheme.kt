@@ -15,15 +15,18 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.netrunner.app.R
 
 val NetRunnerEase = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
@@ -93,7 +96,7 @@ private val LightTokens = NetRunnerVisualTokens(
     modalBorder = Color(0xFFE2E8F0),
 )
 
-val LocalNetRunnerTokens = staticCompositionLocalOf { DarkTokens }
+val LocalNetRunnerTokens = compositionLocalOf { DarkTokens }
 
 private val DarkPalette = darkColorScheme(
     primary = Color(0xFFFFFFFF),
@@ -167,6 +170,7 @@ fun NetRunnerTheme(
 @Composable
 fun NetRunnerWallpaperBox(
     modifier: Modifier = Modifier,
+    backgroundBlur: Dp = 0.dp,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val tokens = LocalNetRunnerTokens.current
@@ -175,47 +179,53 @@ fun NetRunnerWallpaperBox(
             .fillMaxSize()
             .background(tokens.backgroundBase),
     ) {
-        Crossfade(
-            targetState = tokens.isDark,
-            animationSpec = tween(durationMillis = 480, easing = NetRunnerThemeEase),
-            label = "wallpaperThemeCrossfade",
-        ) { dark ->
-            if (dark) {
-                Image(
-                    painter = painterResource(id = R.drawable.bg_dark_wallpaper),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    alignment = Alignment.TopCenter,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color(0xFFF8FAFC),
-                                        Color(0xFFEEF2F7),
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (backgroundBlur > 0.dp) Modifier.blur(backgroundBlur) else Modifier),
+        ) {
+            Crossfade(
+                targetState = tokens.isDark,
+                animationSpec = tween(durationMillis = 480, easing = NetRunnerThemeEase),
+                label = "wallpaperThemeCrossfade",
+            ) { dark ->
+                if (dark) {
+                    Image(
+                        painter = painterResource(id = R.drawable.bg_dark_wallpaper),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        alignment = Alignment.TopCenter,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color(0xFFF8FAFC),
+                                            Color(0xFFEEF2F7),
+                                        ),
                                     ),
                                 ),
-                            ),
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.radialGradient(
-                                    colors = listOf(
-                                        Color(0xD9E2E8F0),
-                                        Color.Transparent,
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.radialGradient(
+                                        colors = listOf(
+                                            Color(0xD9E2E8F0),
+                                            Color.Transparent,
+                                        ),
+                                        center = Offset(0f, 0f),
+                                        radius = 900f,
                                     ),
-                                    center = Offset(0f, 0f),
-                                    radius = 900f,
                                 ),
-                            ),
-                    )
+                        )
+                    }
                 }
             }
         }

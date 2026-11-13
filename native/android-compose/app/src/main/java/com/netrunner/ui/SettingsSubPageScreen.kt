@@ -101,6 +101,7 @@ fun SettingsSubPageScreen(
     onDeleteApiKey: (id: String) -> Unit,
     onAddIntegration: (SettingsModalType, String, String) -> Unit,
     onDeleteIntegration: (SettingsModalType, String) -> Unit,
+    onRequestDeleteConfirm: (title: String, description: String, onConfirm: () -> Unit) -> Unit,
     onShowToast: (String) -> Unit,
 ) {
     val tokens = LocalNetRunnerTokens.current
@@ -732,9 +733,14 @@ fun SettingsSubPageScreen(
                                             // Delete
                                             Surface(
                                                 onClick = {
-                                                    onDeleteApiKey(entry.id)
-                                                    if (expandedKeyId == entry.id) expandedKeyId = null
-                                                    if (editingKeyId == entry.id) editingKeyId = null
+                                                    onRequestDeleteConfirm(
+                                                        "Delete API Key?",
+                                                        "Remove this ${entry.providerLabel} key from your device? You can add it again later.",
+                                                    ) {
+                                                        onDeleteApiKey(entry.id)
+                                                        if (expandedKeyId == entry.id) expandedKeyId = null
+                                                        if (editingKeyId == entry.id) editingKeyId = null
+                                                    }
                                                 },
                                                 shape = RoundedCornerShape(12.dp),
                                                 color = Color(0xFFEF4444).copy(alpha = 0.12f),
@@ -936,7 +942,14 @@ fun SettingsSubPageScreen(
                                 modifier = Modifier
                                     .size(20.dp)
                                     .clip(CircleShape)
-                                    .clickable { onDeleteIntegration(pageType, item.id) },
+                                    .clickable {
+                                        onRequestDeleteConfirm(
+                                            "Delete ${item.name}?",
+                                            "Remove this item from ${pageType.title}?",
+                                        ) {
+                                            onDeleteIntegration(pageType, item.id)
+                                        }
+                                    },
                             )
                         }
                     }

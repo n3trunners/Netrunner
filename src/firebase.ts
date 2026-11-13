@@ -1,50 +1,47 @@
-import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  GithubAuthProvider, 
-  signInWithPopup, 
+import { initializeApp, FirebaseApp } from 'firebase/app';
+import {
+  getAuth,
+  Auth,
+  GithubAuthProvider,
+  signInWithPopup,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   getAdditionalUserInfo,
   User as FirebaseUser
 } from 'firebase/auth';
-import { 
-  getFirestore, 
-  doc, 
-  getDocFromServer, 
-  setDoc, 
-  getDoc, 
-  collection, 
-  getDocs, 
-  deleteDoc 
+import {
+  getFirestore,
+  Firestore,
+  doc,
+  getDocFromServer
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
-// Initialize Firebase App
-const app = initializeApp(firebaseConfig);
+export const isFirebaseConfigured = Boolean(firebaseConfig?.apiKey && firebaseConfig?.projectId);
 
-// Initialize Firestore with specific database ID from config
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+let app: FirebaseApp | null = null;
+let db: Firestore | null = null;
+let auth: Auth | null = null;
 
-// Initialize Firebase Auth
-export const auth = getAuth(app);
+if (isFirebaseConfigured) {
+  app = initializeApp(firebaseConfig);
+  db = firebaseConfig.firestoreDatabaseId
+    ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+    : getFirestore(app);
+  auth = getAuth(app);
+
+  // Verify Firestore connection quietly without blocking initial render
+  getDocFromServer(doc(db, 'test', 'connection')).catch(() => {
+    // Non-blocking connectivity check
+  });
+}
+
+export { db, auth };
 
 // Configure GitHub Auth Provider
 export const githubProvider = new GithubAuthProvider();
 githubProvider.addScope('read:user');
 githubProvider.addScope('repo');
-
-// Test Firestore connection on boot as mandated by skill
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firebase client is offline. Check configuration.');
-    }
-  }
-}
-testConnection();
 
 // Structured Firestore error handler
 export enum OperationType {
@@ -77,12 +74,12 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+      userId: auth?.currentUser?.uid,
+      email: auth?.currentUser?.email,
+      emailVerified: auth?.currentUser?.emailVerified,
+      isAnonymous: auth?.currentUser?.isAnonymous,
+      tenantId: auth?.currentUser?.tenantId,
+      providerInfo: auth?.currentUser?.providerData?.map(provider => ({
         providerId: provider.providerId,
         email: provider.email,
       })) || []

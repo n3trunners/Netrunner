@@ -2,7 +2,6 @@ package com.netrunner.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -50,11 +49,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,24 +68,6 @@ import com.netrunner.ui.theme.LocalNetRunnerTokens
 import com.netrunner.ui.theme.NetRunnerEase
 
 @Composable
-private fun Modifier.settingsSectionReveal(visible: Boolean, delayMillis: Int): Modifier {
-    val alpha by animateFloatAsState(
-        targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(durationMillis = 320, delayMillis = delayMillis, easing = NetRunnerEase),
-        label = "settingsAlpha_$delayMillis",
-    )
-    val offsetY by animateFloatAsState(
-        targetValue = if (visible) 0f else 14f,
-        animationSpec = tween(durationMillis = 360, delayMillis = delayMillis, easing = NetRunnerEase),
-        label = "settingsOffset_$delayMillis",
-    )
-    return this.graphicsLayer {
-        this.alpha = alpha
-        this.translationY = offsetY * density
-    }
-}
-
-@Composable
 fun SettingsScreen(
     currentUser: GitHubUser?,
     selectedLanguage: String,
@@ -100,11 +77,6 @@ fun SettingsScreen(
     onOpenGitHubAuth: () -> Unit,
 ) {
     val tokens = LocalNetRunnerTokens.current
-    var isVisible by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        isVisible = true
-    }
 
     val thumbOffset by animateDpAsState(
         targetValue = if (tokens.isDark) 0.dp else 28.dp,
@@ -130,9 +102,7 @@ fun SettingsScreen(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
-                modifier = Modifier
-                    .padding(top = 2.dp)
-                    .settingsSectionReveal(isVisible, delayMillis = 0),
+                modifier = Modifier.padding(top = 2.dp),
             ) {
                 Icon(
                     imageVector = Icons.Rounded.ChevronLeft,
@@ -182,7 +152,6 @@ fun SettingsScreen(
                 border = BorderStroke(1.dp, tokens.cardBorder),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .settingsSectionReveal(isVisible, delayMillis = 40)
                     .graphicsLayer {
                         scaleX = profileScale
                         scaleY = profileScale
@@ -254,7 +223,6 @@ fun SettingsScreen(
         item {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.settingsSectionReveal(isVisible, delayMillis = 80),
             ) {
                 SectionHeader("AI & Integrations")
                 SettingRow(
@@ -288,7 +256,6 @@ fun SettingsScreen(
         item {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.settingsSectionReveal(isVisible, delayMillis = 120),
             ) {
                 SectionHeader("Preferences")
 
@@ -420,7 +387,6 @@ fun SettingsScreen(
         item {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.settingsSectionReveal(isVisible, delayMillis = 160),
             ) {
                 SectionHeader("Data & Storage")
                 SettingRow(
@@ -436,7 +402,6 @@ fun SettingsScreen(
         item {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.settingsSectionReveal(isVisible, delayMillis = 195),
             ) {
                 SectionHeader("Security")
                 SettingRow(
@@ -452,7 +417,6 @@ fun SettingsScreen(
         item {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.settingsSectionReveal(isVisible, delayMillis = 225),
             ) {
                 SectionHeader("About")
                 SettingRow(

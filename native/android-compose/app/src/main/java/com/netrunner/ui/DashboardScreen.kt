@@ -2,13 +2,12 @@ package com.netrunner.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -47,7 +46,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -77,24 +78,6 @@ import com.netrunner.ui.theme.LocalNetRunnerTokens
 import com.netrunner.ui.theme.NetRunnerEase
 
 @Composable
-private fun Modifier.staggeredEntrance(visible: Boolean, delayMillis: Int): Modifier {
-    val alpha by animateFloatAsState(
-        targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(durationMillis = 360, delayMillis = delayMillis, easing = NetRunnerEase),
-        label = "dashAlpha_$delayMillis",
-    )
-    val offsetY by animateFloatAsState(
-        targetValue = if (visible) 0f else 18f,
-        animationSpec = tween(durationMillis = 420, delayMillis = delayMillis, easing = NetRunnerEase),
-        label = "dashOffset_$delayMillis",
-    )
-    return this.graphicsLayer {
-        this.alpha = alpha
-        this.translationY = offsetY * density
-    }
-}
-
-@Composable
 fun DashboardScreen(
     projects: List<WorkspaceProject>,
     currentUser: GitHubUser?,
@@ -110,20 +93,26 @@ fun DashboardScreen(
     val tokens = LocalNetRunnerTokens.current
     var searchQuery by remember { mutableStateOf("") }
     var selectedTag by remember { mutableStateOf<String?>(null) }
-    var isVisible by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        isVisible = true
+    var prevProjectCount by remember { mutableIntStateOf(projects.size) }
+    LaunchedEffect(projects.size) {
+        if (projects.size > prevProjectCount) {
+            searchQuery = ""
+            selectedTag = null
+        }
+        prevProjectCount = projects.size
     }
 
-    val filteredProjects = remember(projects, searchQuery, selectedTag) {
-        projects.filter { p ->
-            val matchesSearch = searchQuery.isBlank() ||
-                p.name.contains(searchQuery, ignoreCase = true) ||
-                p.description.contains(searchQuery, ignoreCase = true) ||
-                p.category.contains(searchQuery, ignoreCase = true)
-            val matchesTag = selectedTag == null || p.category == selectedTag
-            matchesSearch && matchesTag
+    val filteredProjects by remember {
+        derivedStateOf {
+            projects.filter { p ->
+                val matchesSearch = searchQuery.isBlank() ||
+                    p.name.contains(searchQuery, ignoreCase = true) ||
+                    p.description.contains(searchQuery, ignoreCase = true) ||
+                    p.category.contains(searchQuery, ignoreCase = true)
+                val matchesTag = selectedTag == null || p.category == selectedTag
+                matchesSearch && matchesTag
+            }
         }
     }
 
@@ -153,8 +142,7 @@ fun DashboardScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 2.dp)
-                    .staggeredEntrance(isVisible, delayMillis = 0),
+                    .padding(top = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -264,9 +252,7 @@ fun DashboardScreen(
         // 2. Welcome Section
         item {
             Column(
-                modifier = Modifier
-                    .padding(top = 4.dp)
-                    .staggeredEntrance(isVisible, delayMillis = 45),
+                modifier = Modifier.padding(top = 4.dp),
             ) {
                 Text(
                     text = "Welcome back,",
@@ -306,9 +292,7 @@ fun DashboardScreen(
         item {
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier
-                    .animateContentSize(spring(stiffness = 400f, dampingRatio = 0.82f))
-                    .staggeredEntrance(isVisible, delayMillis = 90),
+                modifier = Modifier.animateContentSize(spring(stiffness = 400f, dampingRatio = 0.82f)),
             ) {
                 val (newProjInteraction, newProjScale) = rememberPressScaleInteraction(0.975f)
                 Surface(
@@ -416,9 +400,7 @@ fun DashboardScreen(
                 shape = CircleShape,
                 color = tokens.inputBg,
                 border = BorderStroke(1.dp, tokens.inputBorder),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .staggeredEntrance(isVisible, delayMillis = 135),
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Row(
                     modifier = Modifier
@@ -478,8 +460,7 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 30.dp, bottom = 16.dp)
-                        .staggeredEntrance(isVisible, delayMillis = 180),
+                        .padding(top = 30.dp, bottom = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     GlossyFolderGraphic()
@@ -539,7 +520,6 @@ fun DashboardScreen(
             item {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.staggeredEntrance(isVisible, delayMillis = 175),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),

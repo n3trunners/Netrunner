@@ -16,6 +16,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { UserCustomIntegration } from '../types';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import {
   BYOK_UPDATED_EVENT,
   SavedApiKeyEntry,
@@ -77,6 +78,11 @@ export function SettingsSubPageView({
   const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [customName, setCustomName] = useState('');
   const [customDetail, setCustomDetail] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<{
+    kind: 'key' | 'custom';
+    id: string;
+    label: string;
+  } | null>(null);
 
   useEffect(() => {
     const sync = () => setSavedKeys(getSavedApiKeys());
@@ -205,8 +211,9 @@ export function SettingsSubPageView({
   const isPlusActive = pageType === 'models' ? showSupportedApis : isAddingCustom;
 
   return (
-    <div className="relative w-full h-full pb-12 overflow-y-auto select-none">
-      <div className="relative z-10 px-5 pt-4 space-y-5">
+    <div className="relative w-full h-full select-none">
+      <div className="relative w-full h-full pb-12 overflow-y-auto">
+        <div className="relative z-10 px-5 pt-4 space-y-5">
         {/* Top Bar: Back + Title + Top-Right Plus Icon */}
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-3.5 min-w-0">
@@ -388,11 +395,10 @@ export function SettingsSubPageView({
                   return (
                     <motion.div
                       key={entry.id}
-                      layout
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -6 }}
-                      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                       className={`rounded-2xl border overflow-hidden transition-colors ${
                         isDarkMode
                           ? 'bg-white/[0.04] border-white/10'
@@ -532,7 +538,13 @@ export function SettingsSubPageView({
 
                                   <button
                                     type="button"
-                                    onClick={() => handleDeleteKey(entry.id)}
+                                    onClick={() =>
+                                      setPendingDelete({
+                                        kind: 'key',
+                                        id: entry.id,
+                                        label: `${entry.providerLabel} key`,
+                                      })
+                                    }
                                     className="py-2 px-3 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -666,7 +678,13 @@ export function SettingsSubPageView({
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleDeleteCustomItem(item.id)}
+                      onClick={() =>
+                        setPendingDelete({
+                          kind: 'custom',
+                          id: item.id,
+                          label: item.name,
+                        })
+                      }
                       className="p-2 rounded-xl text-neutral-400 hover:text-red-500 transition-colors cursor-pointer"
                       aria-label={`Delete ${item.name}`}
                     >
@@ -678,7 +696,26 @@ export function SettingsSubPageView({
             )}
           </div>
         )}
+        </div>
       </div>
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(pendingDelete)}
+        title={`Delete ${pendingDelete?.label || 'Item'}?`}
+        description="This will permanently remove this item from your local workspace."
+        confirmLabel="Delete"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (!pendingDelete) return;
+          if (pendingDelete.kind === 'key') {
+            handleDeleteKey(pendingDelete.id);
+          } else {
+            handleDeleteCustomItem(pendingDelete.id);
+          }
+          setPendingDelete(null);
+        }}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 }

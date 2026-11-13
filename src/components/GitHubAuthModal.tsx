@@ -1,16 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Github, Loader2, AlertCircle } from 'lucide-react';
-import {
-  auth,
-  githubProvider,
-  signInWithPopup,
-  getAdditionalUserInfo,
-  GithubAuthProvider,
-  db
-} from '../firebase';
+import { auth, db } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
 import { GitHubUser, GitHubStats, GitHubRepo } from '../types';
 
 interface GitHubAuthModalProps {
@@ -30,12 +22,20 @@ export function GitHubAuthModal({
 }: GitHubAuthModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const popupWatcherRef = useRef<number | null>(null);
+
+  const clearPopupWatcher = () => {
+    if (popupWatcherRef.current !== null) {
+      window.clearInterval(popupWatcherRef.current);
+      popupWatcherRef.current = null;
+    }
+  };
 
   const finalizeGitHubProfile = async (
     rawProfile: Record<string, any>,
-    accessToken?: string,
-    firebaseUid?: string
+    accessToken?: string
   ) => {
+    clearPopupWatcher();
     const login = rawProfile.login || 'developer';
     const userProfile: GitHubUser = {
       login,
@@ -115,11 +115,11 @@ export function GitHubAuthModal({
         }))
       : [];
 
-    if (firebaseUid) {
+    if (auth?.currentUser && db) {
       try {
-        await setDoc(doc(db, 'users', firebaseUid), {
+        await setDoc(doc(db, 'users', auth.currentUser.uid), {
           ...userProfile,
-          uid: firebaseUid,
+          uid: auth.currentUser.uid,
           updatedAt: new Date().toISOString()
         }, { merge: true });
       } catch (e) {
@@ -134,7 +134,11 @@ export function GitHubAuthModal({
   };
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      clearPopupWatcher();
+      setIsLoading(false);
+      return;
+    }
     const handleMessage = (event: MessageEvent) => {
       const origin = event.origin;
       if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
@@ -145,46 +149,21 @@ export function GitHubAuthModal({
       }
     };
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      clearPopupWatcher();
+    };
   }, [isOpen]);
-
-  if (!isOpen) return null;
 
   const handleContinueWithGitHub = async () => {
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
-      const hasFirebaseAuth = Boolean(firebaseConfig?.apiKey);
-      if (hasFirebaseAuth) {
-        const result = await signInWithPopup(auth, githubProvider);
-        const fbUser = result.user;
-        const additionalInfo = getAdditionalUserInfo(result);
-        const credential = GithubAuthProvider.credentialFromResult(result);
-        const accessToken = credential?.accessToken;
-        const rawProfile: any = additionalInfo?.profile || {};
-        const login =
-          additionalInfo?.username ||
-          rawProfile.login ||
-          (fbUser.displayName ? fbUser.displayName.replace(/\s+/g, '') : 'developer');
-
-        await finalizeGitHubProfile(
-          {
-            ...rawProfile,
-            login,
-            name: rawProfile.name || fbUser.displayName || login,
-            avatar_url: rawProfile.avatar_url || fbUser.photoURL || `https://github.com/${login}.png`,
-          },
-          accessToken,
-          fbUser.uid
-        );
-        return;
-      }
-
-      // Direct GitHub OAuth popup flow via server
+      // Direct GitHub OAuth popup flow via server — avoids storage-partitioned iframe sessionStorage/signInWithRedirect errors
       const res = await fetch('/api/auth/github/url?platform=web');
       if (!res.ok) {
-        throw new Error('Could not initialize GitHub OAuth.');
+        throw new Error(`Auth server returned HTTP ${res.status}`);
       }
       const data = await res.json();
       if (!data.configured || !data.url) {
@@ -195,100 +174,117 @@ export function GitHubAuthModal({
       if (!authWindow) {
         throw new Error('Sign-in popup was blocked by your browser. Please allow popups.');
       }
+
+      clearPopupWatcher();
+      popupWatcherRef.current = window.setInterval(() => {
+        if (authWindow.closed) {
+          clearPopupWatcher();
+          setIsLoading(false);
+        }
+      }, 400);
     } catch (err: any) {
       console.error('GitHub authentication error:', err);
-      if (err.code === 'auth/operation-not-allowed') {
-        setErrorMessage(
-          'GitHub provider is not yet enabled in Firebase Console. Enable it under Authentication > Sign-in method > GitHub.'
-        );
-      } else if (err.code === 'auth/popup-blocked') {
-        setErrorMessage('Sign-in popup was blocked by browser. Please allow popups for this page.');
-      } else {
-        setErrorMessage(err.message || 'Authentication failed. Please try again.');
-      }
+      setErrorMessage(err?.message || 'Authentication failed. Please try again.');
       setIsLoading(false);
     }
   };
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
+      {isOpen && (
         <motion.div
-          initial={{ opacity: 0, scale: 0.94, y: 15 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.94, y: 15 }}
-          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-          className={`relative w-full max-w-sm rounded-3xl p-6 border shadow-2xl overflow-hidden transition-colors ${
-            isDarkMode 
-              ? 'bg-[#0d0f14] border-white/12 text-white' 
-              : 'bg-white border-neutral-200 text-neutral-900 shadow-xl'
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          className={`absolute inset-0 z-50 flex items-center justify-center p-4 ${
+            isDarkMode ? 'bg-black/30' : 'bg-slate-900/12'
           }`}
         >
-          {/* Close button */}
-          <button
-            onClick={onClose}
-            className={`absolute top-4 right-4 p-1.5 rounded-full transition-colors cursor-pointer ${
-              isDarkMode 
-                ? 'text-neutral-400 hover:text-white hover:bg-white/10' 
-                : 'text-neutral-500 hover:text-black hover:bg-neutral-100'
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.94, y: 12 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className={`relative w-full max-w-sm rounded-[28px] p-6 border backdrop-blur-2xl backdrop-saturate-150 overflow-hidden transition-colors ${
+              isDarkMode
+                ? 'bg-[#0d111a]/48 border-white/20 text-white shadow-[0_28px_80px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.22)]'
+                : 'bg-white/58 border-white/85 text-neutral-900 shadow-[0_24px_64px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.95)]'
             }`}
           >
-            <X className="w-5 h-5" />
-          </button>
+            {/* Top specular highlight */}
+            <div
+              aria-hidden="true"
+              className={`pointer-events-none absolute inset-x-6 top-0 h-px ${
+                isDarkMode
+                  ? 'bg-gradient-to-r from-transparent via-white/45 to-transparent'
+                  : 'bg-gradient-to-r from-transparent via-white to-transparent'
+              }`}
+            />
 
-          {/* Clean Card Content */}
-          <div className="text-center pt-2 pb-1 space-y-4">
-            <div className={`w-14 h-14 rounded-2xl mx-auto flex items-center justify-center shadow-lg border ${
-              isDarkMode 
-                ? 'bg-white/5 border-white/15 text-white' 
-                : 'bg-neutral-900 border-neutral-800 text-white'
-            }`}>
-              <Github className="w-7 h-7" />
-            </div>
+            <button
+              onClick={onClose}
+              className={`absolute top-4 right-4 p-1.5 rounded-full transition-colors cursor-pointer ${
+                isDarkMode
+                  ? 'text-neutral-300 hover:text-white hover:bg-white/12'
+                  : 'text-neutral-500 hover:text-black hover:bg-black/8'
+              }`}
+            >
+              <X className="w-5 h-5" />
+            </button>
 
-            <div>
-              <h3 className="font-bold text-lg tracking-tight">
-                Sign in to NetRunner
-              </h3>
-              <p className={`text-xs mt-1 leading-relaxed ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                Sign in with your GitHub account to access your workspace and sync repositories.
-              </p>
-            </div>
-
-            {errorMessage && (
-              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs text-left flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span className="leading-relaxed">{errorMessage}</span>
+            <div className="text-center pt-2 pb-1 space-y-4">
+              <div className={`w-14 h-14 rounded-2xl mx-auto flex items-center justify-center shadow-lg border ${
+                isDarkMode
+                  ? 'bg-white/8 border-white/18 text-white'
+                  : 'bg-neutral-900 border-neutral-800 text-white'
+              }`}>
+                <Github className="w-7 h-7" />
               </div>
-            )}
 
-            {/* Single clean Continue with GitHub button */}
-            <div className="pt-2">
-              <button
-                onClick={handleContinueWithGitHub}
-                disabled={isLoading}
-                className={`w-full py-3.5 px-6 rounded-full font-semibold text-xs active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 shadow-lg disabled:opacity-50 cursor-pointer ${
-                  isDarkMode
-                    ? 'bg-white text-black hover:bg-neutral-200 shadow-[0_4px_20px_rgba(255,255,255,0.2)]'
-                    : 'bg-neutral-900 text-white hover:bg-black shadow-[0_4px_20px_rgba(0,0,0,0.2)]'
-                }`}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Connecting with GitHub...</span>
-                  </>
-                ) : (
-                  <>
-                    <Github className="w-4 h-4" />
-                    <span>Continue with GitHub</span>
-                  </>
-                )}
-              </button>
+              <div>
+                <h3 className="font-bold text-lg tracking-tight">
+                  Sign in to NetRunner
+                </h3>
+                <p className={`text-xs mt-1 leading-relaxed ${isDarkMode ? 'text-neutral-300' : 'text-neutral-600'}`}>
+                  Sign in with your GitHub account to access your workspace and sync repositories.
+                </p>
+              </div>
+
+              {errorMessage && (
+                <div className="p-3 rounded-2xl bg-amber-500/12 border border-amber-500/25 text-amber-300 text-xs text-left flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span className="leading-relaxed">{errorMessage}</span>
+                </div>
+              )}
+
+              <div className="pt-2">
+                <button
+                  onClick={handleContinueWithGitHub}
+                  disabled={isLoading}
+                  className={`w-full py-3.5 px-6 rounded-full font-semibold text-xs active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 shadow-lg disabled:opacity-50 cursor-pointer ${
+                    isDarkMode
+                      ? 'bg-white text-black hover:bg-neutral-200 shadow-[0_4px_20px_rgba(255,255,255,0.2)]'
+                      : 'bg-neutral-900 text-white hover:bg-black shadow-[0_4px_20px_rgba(0,0,0,0.2)]'
+                  }`}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Connecting with GitHub...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Github className="w-4 h-4" />
+                      <span>Continue with GitHub</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-          </div>
+          </motion.div>
         </motion.div>
-      </div>
+      )}
     </AnimatePresence>
   );
 }

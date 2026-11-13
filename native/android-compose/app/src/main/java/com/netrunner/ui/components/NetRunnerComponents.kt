@@ -60,6 +60,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -68,6 +69,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -204,6 +206,47 @@ fun DiscordMarkIcon(
 }
 
 @Composable
+fun XMarkIcon(
+    modifier: Modifier = Modifier,
+    size: Dp = 18.dp,
+    tint: Color = LocalNetRunnerTokens.current.textTitle,
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .drawWithCache {
+                val sx = this.size.width / 24f
+                val sy = this.size.height / 24f
+                val path = Path().apply {
+                    fillType = PathFillType.EvenOdd
+                    moveTo(18.244f * sx, 2.25f * sy)
+                    lineTo(21.552f * sx, 2.25f * sy)
+                    lineTo(14.325f * sx, 10.51f * sy)
+                    lineTo(22.827f * sx, 21.75f * sy)
+                    lineTo(16.170f * sx, 21.75f * sy)
+                    lineTo(10.956f * sx, 14.933f * sy)
+                    lineTo(4.990f * sx, 21.75f * sy)
+                    lineTo(1.680f * sx, 21.75f * sy)
+                    lineTo(9.410f * sx, 12.915f * sy)
+                    lineTo(1.254f * sx, 2.25f * sy)
+                    lineTo(8.080f * sx, 2.25f * sy)
+                    lineTo(12.793f * sx, 8.481f * sy)
+                    close()
+
+                    moveTo(17.083f * sx, 19.77f * sy)
+                    lineTo(18.916f * sx, 19.77f * sy)
+                    lineTo(7.084f * sx, 4.126f * sy)
+                    lineTo(5.117f * sx, 4.126f * sy)
+                    close()
+                }
+                onDrawBehind {
+                    drawPath(path = path, color = tint)
+                }
+            },
+    )
+}
+
+@Composable
 fun NetworkAvatarImage(
     url: String,
     contentDescription: String,
@@ -266,85 +309,61 @@ fun GlossyFolderGraphic(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .size(128.dp)
-            .graphicsLayer { translationY = floatY.dp.toPx() },
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val sx = size.width / 120f
-            val sy = size.height / 100f
+            .graphicsLayer { translationY = floatY.dp.toPx() }
+            .drawWithCache {
+                val sx = size.width / 120f
+                val sy = size.height / 100f
 
-            // Folder Back Tab
-            val backPath = Path().apply {
-                moveTo(18f * sx, 24f * sy)
-                cubicTo(18f * sx, 20.7f * sy, 20.7f * sx, 18f * sy, 24f * sx, 18f * sy)
-                lineTo(44f * sx, 18f * sy)
-                cubicTo(46.8f * sx, 18f * sy, 49.3f * sx, 19.5f * sy, 50.7f * sx, 21.8f * sy)
-                lineTo(54.3f * sx, 27.5f * sy)
-                cubicTo(55.2f * sx, 29f * sy, 56.8f * sx, 30f * sy, 58.6f * sx, 30f * sy)
-                lineTo(96f * sx, 30f * sy)
-                cubicTo(99.3f * sx, 30f * sy, 102f * sx, 32.7f * sy, 102f * sx, 36f * sy)
-                lineTo(102f * sx, 78f * sy)
-                cubicTo(102f * sx, 81.3f * sy, 99.3f * sx, 84f * sy, 96f * sx, 84f * sy)
-                lineTo(24f * sx, 84f * sy)
-                cubicTo(20.7f * sx, 84f * sy, 18f * sx, 81.3f * sy, 18f * sx, 78f * sy)
-                close()
-            }
-            drawPath(
-                path = backPath,
-                brush = Brush.linearGradient(
+                val backPath = Path().apply {
+                    moveTo(18f * sx, 24f * sy)
+                    cubicTo(18f * sx, 20.7f * sy, 20.7f * sx, 18f * sy, 24f * sx, 18f * sy)
+                    lineTo(44f * sx, 18f * sy)
+                    cubicTo(46.8f * sx, 18f * sy, 49.3f * sx, 19.5f * sy, 50.7f * sx, 21.8f * sy)
+                    lineTo(54.3f * sx, 27.5f * sy)
+                    cubicTo(55.2f * sx, 29f * sy, 56.8f * sx, 30f * sy, 58.6f * sx, 30f * sy)
+                    lineTo(96f * sx, 30f * sy)
+                    cubicTo(99.3f * sx, 30f * sy, 102f * sx, 32.7f * sy, 102f * sx, 36f * sy)
+                    lineTo(102f * sx, 78f * sy)
+                    cubicTo(102f * sx, 81.3f * sy, 99.3f * sx, 84f * sy, 96f * sx, 84f * sy)
+                    lineTo(24f * sx, 84f * sy)
+                    cubicTo(20.7f * sx, 84f * sy, 18f * sx, 81.3f * sy, 18f * sx, 78f * sy)
+                    close()
+                }
+                val backBrush = Brush.linearGradient(
                     colors = listOf(Color(0xFF2C3038), Color(0xFF1A1C22), Color(0xFF101115)),
                     start = Offset(10f * sx, 20f * sy),
                     end = Offset(110f * sx, 85f * sy),
-                ),
-            )
-            drawPath(
-                path = backPath,
-                color = Color.White.copy(alpha = 0.08f),
-                style = Stroke(width = 1.2f * sx),
-            )
+                )
+                val backStroke = Stroke(width = 1.2f * sx)
 
-            // Paper / Inner Glow peek
-            val peekPath = Path().apply {
-                moveTo(26f * sx, 30f * sy)
-                lineTo(94f * sx, 30f * sy)
-                cubicTo(96f * sx, 30f * sy, 98f * sx, 31.5f * sy, 98f * sx, 33.5f * sy)
-                lineTo(98f * sx, 45f * sy)
-                lineTo(22f * sx, 45f * sy)
-                lineTo(22f * sx, 33.5f * sy)
-                cubicTo(22f * sx, 31.5f * sy, 24f * sx, 30f * sy, 26f * sx, 30f * sy)
-                close()
-            }
-            drawPath(path = peekPath, color = Color.White.copy(alpha = 0.04f))
+                val peekPath = Path().apply {
+                    moveTo(26f * sx, 30f * sy)
+                    lineTo(94f * sx, 30f * sy)
+                    cubicTo(96f * sx, 30f * sy, 98f * sx, 31.5f * sy, 98f * sx, 33.5f * sy)
+                    lineTo(98f * sx, 45f * sy)
+                    lineTo(22f * sx, 45f * sy)
+                    lineTo(22f * sx, 33.5f * sy)
+                    cubicTo(22f * sx, 31.5f * sy, 24f * sx, 30f * sy, 26f * sx, 30f * sy)
+                    close()
+                }
 
-            // Folder Front Flap
-            val frontPath = Path().apply {
-                moveTo(24f * sx, 37f * sy)
-                cubicTo(24f * sx, 34.2f * sy, 26.2f * sx, 32f * sy, 29f * sx, 32f * sy)
-                lineTo(91f * sx, 32f * sy)
-                cubicTo(93.8f * sx, 32f * sy, 96f * sx, 34.2f * sy, 96f * sx, 37f * sy)
-                lineTo(91f * sx, 82f * sy)
-                cubicTo(90.6f * sx, 85.2f * sy, 87.8f * sx, 87.5f * sy, 84.6f * sx, 87.5f * sy)
-                lineTo(23.4f * sx, 87.5f * sy)
-                cubicTo(20.2f * sx, 87.5f * sy, 17.4f * sx, 85.2f * sy, 17f * sx, 82f * sy)
-                close()
-            }
-            drawPath(
-                path = frontPath,
-                brush = Brush.linearGradient(
+                val frontPath = Path().apply {
+                    moveTo(24f * sx, 37f * sy)
+                    cubicTo(24f * sx, 34.2f * sy, 26.2f * sx, 32f * sy, 29f * sx, 32f * sy)
+                    lineTo(91f * sx, 32f * sy)
+                    cubicTo(93.8f * sx, 32f * sy, 96f * sx, 34.2f * sy, 96f * sx, 37f * sy)
+                    lineTo(91f * sx, 82f * sy)
+                    cubicTo(90.6f * sx, 85.2f * sy, 87.8f * sx, 87.5f * sy, 84.6f * sx, 87.5f * sy)
+                    lineTo(23.4f * sx, 87.5f * sy)
+                    cubicTo(20.2f * sx, 87.5f * sy, 17.4f * sx, 85.2f * sy, 17f * sx, 82f * sy)
+                    close()
+                }
+                val frontBrush = Brush.linearGradient(
                     colors = listOf(Color(0xFF3A3F4B), Color(0xFF242730), Color(0xFF12141A)),
                     start = Offset(15f * sx, 36f * sy),
                     end = Offset(105f * sx, 92f * sy),
-                ),
-            )
-            drawPath(
-                path = frontPath,
-                color = Color.White.copy(alpha = 0.10f),
-                style = Stroke(width = 1.2f * sx),
-            )
-
-            // Top Rim Specular Highlight
-            drawLine(
-                brush = Brush.horizontalGradient(
+                )
+                val rimBrush = Brush.horizontalGradient(
                     colors = listOf(
                         Color.White.copy(alpha = 0.4f),
                         Color.White.copy(alpha = 0.15f),
@@ -352,16 +371,9 @@ fun GlossyFolderGraphic(modifier: Modifier = Modifier) {
                     ),
                     startX = 27f * sx,
                     endX = 93f * sx,
-                ),
-                start = Offset(27f * sx, 34f * sy),
-                end = Offset(93f * sx, 34f * sy),
-                strokeWidth = 1.5f * sx,
-                cap = StrokeCap.Round,
-            )
+                )
 
-            // Sparkle 1 & Sparkle 2
-            fun drawSparkle(cx: Float, cy: Float, r: Float, alpha: Float) {
-                val sp = Path().apply {
+                fun buildSparklePath(cx: Float, cy: Float, r: Float): Path = Path().apply {
                     moveTo(cx, cy - r)
                     lineTo(cx + r * 0.22f, cy - r * 0.22f)
                     lineTo(cx + r, cy)
@@ -372,12 +384,27 @@ fun GlossyFolderGraphic(modifier: Modifier = Modifier) {
                     lineTo(cx - r * 0.22f, cy - r * 0.22f)
                     close()
                 }
-                drawPath(sp, color = sparkleColor.copy(alpha = alpha))
-            }
-            drawSparkle(98f * sx, 12f * sy, 8.5f * sx, alpha1)
-            drawSparkle(112f * sx, 26f * sy, 6.5f * sx, alpha2)
-        }
-    }
+                val sparkle1 = buildSparklePath(98f * sx, 12f * sy, 8.5f * sx)
+                val sparkle2 = buildSparklePath(112f * sx, 26f * sy, 6.5f * sx)
+
+                onDrawBehind {
+                    drawPath(path = backPath, brush = backBrush)
+                    drawPath(path = backPath, color = Color.White.copy(alpha = 0.08f), style = backStroke)
+                    drawPath(path = peekPath, color = Color.White.copy(alpha = 0.04f))
+                    drawPath(path = frontPath, brush = frontBrush)
+                    drawPath(path = frontPath, color = Color.White.copy(alpha = 0.10f), style = backStroke)
+                    drawLine(
+                        brush = rimBrush,
+                        start = Offset(27f * sx, 34f * sy),
+                        end = Offset(93f * sx, 34f * sy),
+                        strokeWidth = 1.5f * sx,
+                        cap = StrokeCap.Round,
+                    )
+                    drawPath(sparkle1, color = sparkleColor.copy(alpha = alpha1))
+                    drawPath(sparkle2, color = sparkleColor.copy(alpha = alpha2))
+                }
+            },
+    )
 }
 
 private data class DockTabItem(

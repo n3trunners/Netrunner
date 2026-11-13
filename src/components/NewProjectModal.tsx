@@ -38,18 +38,22 @@ export function NewProjectModal({ isOpen, onClose, onCreateProject, isDarkMode =
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/55 backdrop-blur-xl"
+          transition={{ duration: 0.18 }}
+          onClick={onClose}
+          className={`absolute inset-0 z-50 flex items-center justify-center p-5 ${
+            isDarkMode ? 'bg-black/25' : 'bg-slate-900/10'
+          }`}
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.94, y: 14 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.94, y: 14 }}
-            transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
-            className={`relative w-full max-w-sm rounded-[28px] border backdrop-blur-2xl overflow-hidden transition-colors duration-300 ${
+            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+            onClick={(e) => e.stopPropagation()}
+            className={`relative w-full max-w-sm rounded-[28px] border backdrop-blur-[28px] backdrop-saturate-150 overflow-hidden transition-colors duration-300 ${
               isDarkMode
-                ? 'bg-[#10141e]/65 border-white/18 text-white shadow-[0_32px_90px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.22)]'
-                : 'bg-white/68 border-white/90 text-neutral-900 shadow-[0_28px_72px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.95)]'
+                ? 'bg-[#0b0f18]/38 border-white/22 text-white shadow-[0_32px_90px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.24)]'
+                : 'bg-white/52 border-white/90 text-neutral-900 shadow-[0_28px_72px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.95)]'
             }`}
           >
             {/* Luminous frosted specular top highlight */}
@@ -57,7 +61,7 @@ export function NewProjectModal({ isOpen, onClose, onCreateProject, isDarkMode =
               aria-hidden="true"
               className={`pointer-events-none absolute inset-x-6 top-0 h-px ${
                 isDarkMode
-                  ? 'bg-gradient-to-r from-transparent via-white/45 to-transparent'
+                  ? 'bg-gradient-to-r from-transparent via-white/50 to-transparent'
                   : 'bg-gradient-to-r from-transparent via-white to-transparent'
               }`}
             />
@@ -70,8 +74,8 @@ export function NewProjectModal({ isOpen, onClose, onCreateProject, isDarkMode =
                 onClick={onClose}
                 className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
                   isDarkMode
-                    ? 'bg-white/[0.07] text-neutral-300 hover:bg-white/15 hover:text-white'
-                    : 'bg-black/[0.05] text-neutral-600 hover:bg-black/10 hover:text-black'
+                    ? 'bg-white/[0.08] text-neutral-300 hover:bg-white/15 hover:text-white'
+                    : 'bg-black/[0.06] text-neutral-600 hover:bg-black/12 hover:text-black'
                 }`}
                 aria-label="Close"
               >
@@ -84,7 +88,7 @@ export function NewProjectModal({ isOpen, onClose, onCreateProject, isDarkMode =
                 <label
                   htmlFor="new-project-name"
                   className={`block text-xs font-medium mb-1.5 ${
-                    isDarkMode ? 'text-neutral-300' : 'text-neutral-700'
+                    isDarkMode ? 'text-neutral-200' : 'text-neutral-700'
                   }`}
                 >
                   Project Name
@@ -97,10 +101,10 @@ export function NewProjectModal({ isOpen, onClose, onCreateProject, isDarkMode =
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
                   placeholder="Enter project name"
-                  className={`w-full px-4 py-3 rounded-2xl border backdrop-blur-md text-sm focus:outline-none transition-all ${
+                  className={`w-full px-4 py-3 rounded-2xl border text-sm focus:outline-none transition-all ${
                     isDarkMode
-                      ? 'bg-white/[0.07] border-white/14 text-white placeholder-neutral-500 focus:border-white/35 focus:bg-white/[0.11]'
-                      : 'bg-white/75 border-neutral-300/70 text-neutral-900 placeholder-neutral-400 focus:border-neutral-600 focus:bg-white/95'
+                      ? 'bg-white/[0.08] border-white/16 text-white placeholder-neutral-400 focus:border-white/40 focus:bg-white/[0.12]'
+                      : 'bg-white/65 border-white/80 text-neutral-900 placeholder-neutral-500 focus:border-neutral-600 focus:bg-white/90'
                   }`}
                 />
               </div>
@@ -109,7 +113,7 @@ export function NewProjectModal({ isOpen, onClose, onCreateProject, isDarkMode =
                 <label
                   htmlFor="new-project-description"
                   className={`block text-xs font-medium mb-1.5 ${
-                    isDarkMode ? 'text-neutral-300' : 'text-neutral-700'
+                    isDarkMode ? 'text-neutral-200' : 'text-neutral-700'
                   }`}
                 >
                   Project Description
@@ -120,10 +124,10 @@ export function NewProjectModal({ isOpen, onClose, onCreateProject, isDarkMode =
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Describe your project"
-                  className={`w-full px-4 py-3 rounded-2xl border backdrop-blur-md text-sm resize-none focus:outline-none transition-all ${
+                  className={`w-full px-4 py-3 rounded-2xl border text-sm resize-none focus:outline-none transition-all ${
                     isDarkMode
-                      ? 'bg-white/[0.07] border-white/14 text-white placeholder-neutral-500 focus:border-white/35 focus:bg-white/[0.11]'
-                      : 'bg-white/75 border-neutral-300/70 text-neutral-900 placeholder-neutral-400 focus:border-neutral-600 focus:bg-white/95'
+                      ? 'bg-white/[0.08] border-white/16 text-white placeholder-neutral-400 focus:border-white/40 focus:bg-white/[0.12]'
+                      : 'bg-white/65 border-white/80 text-neutral-900 placeholder-neutral-500 focus:border-neutral-600 focus:bg-white/90'
                   }`}
                 />
               </div>
@@ -134,8 +138,8 @@ export function NewProjectModal({ isOpen, onClose, onCreateProject, isDarkMode =
                   onClick={onClose}
                   className={`px-4 py-2.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                     isDarkMode
-                      ? 'text-neutral-300 hover:text-white hover:bg-white/10'
-                      : 'text-neutral-600 hover:text-black hover:bg-black/5'
+                      ? 'text-neutral-200 hover:text-white hover:bg-white/10'
+                      : 'text-neutral-700 hover:text-black hover:bg-black/5'
                   }`}
                 >
                   Cancel

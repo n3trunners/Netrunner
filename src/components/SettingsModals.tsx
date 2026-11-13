@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Check, ExternalLink, Github } from 'lucide-react';
+import { X, Check, ExternalLink, Github, Clock } from 'lucide-react';
 import { SettingsModalType, GitHubUser } from '../types';
-import { NetRunnerLogo, DiscordLogo } from './Icons';
+import { NetRunnerLogo, DiscordLogo, XLogo } from './Icons';
 
 interface SettingsModalsProps {
   activeModal: SettingsModalType;
@@ -34,33 +34,54 @@ export function SettingsModals({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.18 }}
+        onClick={onClose}
+        className={`absolute inset-0 z-50 flex items-center justify-center p-4 ${
+          isDarkMode ? 'bg-black/28' : 'bg-slate-900/12'
+        }`}
+      >
         <motion.div
-          initial={{ opacity: 0, scale: 0.94, y: 15 }}
+          initial={{ opacity: 0, scale: 0.94, y: 14 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.94, y: 15 }}
-          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-          className={`relative w-full max-w-md max-h-[85vh] flex flex-col rounded-3xl border shadow-2xl overflow-hidden transition-colors ${
+          exit={{ opacity: 0, scale: 0.94, y: 14 }}
+          transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+          onClick={(e) => e.stopPropagation()}
+          className={`relative w-full max-w-md max-h-[85vh] flex flex-col rounded-[28px] border backdrop-blur-[28px] backdrop-saturate-150 overflow-hidden transition-colors ${
             isDarkMode
-              ? 'bg-[#0c0e12] border-white/12 text-neutral-300'
-              : 'bg-white border-neutral-200 text-neutral-800'
+              ? 'bg-[#0b0f18]/44 border-white/22 text-neutral-200 shadow-[0_32px_90px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.22)]'
+              : 'bg-white/56 border-white/90 text-neutral-800 shadow-[0_28px_72px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.95)]'
           }`}
         >
+          {/* Top specular edge gleam */}
+          <div
+            aria-hidden="true"
+            className={`pointer-events-none absolute inset-x-6 top-0 h-px ${
+              isDarkMode
+                ? 'bg-gradient-to-r from-transparent via-white/45 to-transparent'
+                : 'bg-gradient-to-r from-transparent via-white to-transparent'
+            }`}
+          />
+
           {/* Modal Header */}
           <div className={`flex items-center justify-between px-6 py-4 border-b ${
-            isDarkMode ? 'border-white/10 bg-white/[0.02]' : 'border-neutral-100 bg-neutral-50'
+            isDarkMode ? 'border-white/10 bg-white/[0.03]' : 'border-black/5 bg-white/30'
           }`}>
             <div className="flex items-center gap-2.5">
               <NetRunnerLogo className="w-5 h-5" isDark={isDarkMode} />
               <h3 className="font-semibold tracking-wide text-sm capitalize">
-                {activeModal.replace('-', ' ')}
+                {activeModal === 'about' ? 'About NetRunner' : activeModal.replace('-', ' ')}
               </h3>
             </div>
             <button
               onClick={onClose}
               className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                isDarkMode ? 'text-neutral-400 hover:text-white hover:bg-white/10' : 'text-neutral-500 hover:text-black hover:bg-neutral-100'
+                isDarkMode ? 'text-neutral-300 hover:text-white hover:bg-white/12' : 'text-neutral-500 hover:text-black hover:bg-black/8'
               }`}
+              aria-label="Close"
             >
               <X className="w-5 h-5" />
             </button>
@@ -74,7 +95,7 @@ export function SettingsModals({
                 {currentUser ? (
                   <div className="space-y-4">
                     <div className={`flex items-center gap-3.5 p-4 rounded-2xl border ${
-                      isDarkMode ? 'bg-white/[0.03] border-white/8' : 'bg-neutral-50 border-neutral-200'
+                      isDarkMode ? 'bg-white/[0.06] border-white/12' : 'bg-white/60 border-white/80'
                     }`}>
                       <img
                         src={currentUser.avatar_url}
@@ -95,8 +116,8 @@ export function SettingsModals({
                       </div>
                     </div>
 
-                    <div className={`p-3 rounded-2xl border text-xs space-y-1.5 ${
-                      isDarkMode ? 'bg-white/[0.02] border-white/5 opacity-80' : 'bg-neutral-50 border-neutral-200 text-neutral-700'
+                    <div className={`p-3.5 rounded-2xl border text-xs space-y-1.5 ${
+                      isDarkMode ? 'bg-white/[0.04] border-white/10 opacity-85' : 'bg-white/50 border-white/80 text-neutral-700'
                     }`}>
                       <div className="flex justify-between">
                         <span>Public Repositories:</span>
@@ -111,14 +132,14 @@ export function SettingsModals({
                     <div className="flex gap-2 pt-2">
                       <button
                         onClick={onSignOut}
-                        className="flex-1 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-medium border border-red-500/20 transition-colors cursor-pointer"
+                        className="flex-1 py-2.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-400 text-xs font-medium border border-red-500/25 transition-colors cursor-pointer"
                       >
                         Sign Out
                       </button>
                       <button
                         onClick={onOpenGitHubAuth}
                         className={`flex-1 py-2.5 rounded-xl border text-xs font-medium transition-colors cursor-pointer ${
-                          isDarkMode ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white' : 'bg-neutral-100 hover:bg-neutral-200 border-neutral-300 text-neutral-800'
+                          isDarkMode ? 'bg-white/8 hover:bg-white/15 border-white/15 text-white' : 'bg-white/70 hover:bg-white border-neutral-300 text-neutral-800'
                         }`}
                       >
                         Switch Account
@@ -128,13 +149,13 @@ export function SettingsModals({
                 ) : (
                   <div className="space-y-4 text-center py-2">
                     <div className={`w-14 h-14 rounded-full border mx-auto flex items-center justify-center ${
-                      isDarkMode ? 'bg-white/5 border-white/10' : 'bg-neutral-100 border-neutral-300 text-neutral-900'
+                      isDarkMode ? 'bg-white/8 border-white/15' : 'bg-white/70 border-neutral-300 text-neutral-900'
                     }`}>
                       <Github className="w-7 h-7" />
                     </div>
                     <div>
                       <h4 className="text-base font-bold">No GitHub Account Connected</h4>
-                      <p className="text-xs opacity-70 mt-1 max-w-xs mx-auto">
+                      <p className="text-xs opacity-75 mt-1 max-w-xs mx-auto">
                         Sign in to import your real GitHub stats, public repositories, and activity.
                       </p>
                     </div>
@@ -162,8 +183,8 @@ export function SettingsModals({
                     onClick={() => { setSelectedLanguage(lang); onShowToast(`Locale set to ${lang}`); }}
                     className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-colors ${
                       selectedLanguage.includes(lang.slice(0, 3))
-                        ? (isDarkMode ? 'bg-white/10 border-white/30 font-semibold' : 'bg-neutral-100 border-neutral-400 font-semibold')
-                        : (isDarkMode ? 'bg-white/[0.03] border-white/8 hover:bg-white/[0.06]' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100')
+                        ? (isDarkMode ? 'bg-white/15 border-white/30 font-semibold' : 'bg-white/85 border-neutral-400 font-semibold')
+                        : (isDarkMode ? 'bg-white/[0.05] border-white/10 hover:bg-white/[0.09]' : 'bg-white/45 border-white/75 hover:bg-white/75')
                     }`}
                   >
                     <span>{lang}</span>
@@ -183,7 +204,7 @@ export function SettingsModals({
                   { key: 'commitSync', label: 'GitHub Activity Sync' }
                 ].map((item) => (
                   <div key={item.key} className={`p-3.5 rounded-2xl border flex items-center justify-between ${
-                    isDarkMode ? 'bg-white/[0.03] border-white/8' : 'bg-neutral-50 border-neutral-200'
+                    isDarkMode ? 'bg-white/[0.05] border-white/10' : 'bg-white/55 border-white/80'
                   }`}>
                     <span className="text-xs font-medium">{item.label}</span>
                     <button
@@ -208,63 +229,19 @@ export function SettingsModals({
               </div>
             )}
 
-            {/* Editor Preferences */}
-            {activeModal === 'editor' && (
-              <div className="space-y-3">
-                <p className="text-xs opacity-75">Editor typography and code layout.</p>
-                <div className={`p-3.5 rounded-2xl border space-y-3 text-xs ${
-                  isDarkMode ? 'bg-white/[0.03] border-white/8' : 'bg-neutral-50 border-neutral-200'
+            {/* Editor Preferences / Data & Storage / Security -> Currently Unavailable */}
+            {(activeModal === 'editor' || activeModal === 'data-storage' || activeModal === 'security') && (
+              <div className="py-8 px-4 flex flex-col items-center justify-center text-center space-y-3">
+                <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center ${
+                  isDarkMode ? 'bg-white/[0.07] border-white/15 text-neutral-300' : 'bg-white/70 border-neutral-300/80 text-neutral-700'
                 }`}>
-                  <div className="flex justify-between items-center">
-                    <span>Font Family</span>
-                    <span className={`font-mono px-2 py-0.5 rounded ${isDarkMode ? 'bg-white/10' : 'bg-neutral-200'}`}>JetBrains Mono</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>Tab Size</span>
-                    <span>2 Spaces</span>
-                  </div>
+                  <Clock className="w-5 h-5" />
                 </div>
-              </div>
-            )}
-
-            {/* Data & Storage */}
-            {activeModal === 'data-storage' && (
-              <div className="space-y-3">
-                <p className="text-xs opacity-75">Local repository cache and Firestore cloud storage.</p>
-                <div className={`p-3.5 rounded-2xl border text-xs space-y-2 ${
-                  isDarkMode ? 'bg-white/[0.03] border-white/8' : 'bg-neutral-50 border-neutral-200'
-                }`}>
-                  <div className="flex justify-between">
-                    <span>Firestore Database:</span>
-                    <span className="font-mono text-emerald-500 font-medium">Connected (Enterprise)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Local Cache:</span>
-                    <span className="font-mono">Clean</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Security */}
-            {activeModal === 'security' && (
-              <div className="space-y-3">
-                <p className="text-xs opacity-75">Authentication, BYOK token isolation, and Firestore rules.</p>
-                <div className={`p-3.5 rounded-2xl border text-xs space-y-2 ${
-                  isDarkMode ? 'bg-white/[0.03] border-white/8' : 'bg-neutral-50 border-neutral-200'
-                }`}>
-                  <div className="flex justify-between items-center">
-                    <span>Auth Provider:</span>
-                    <span className="text-emerald-500 font-mono">Firebase Auth (GitHub)</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>AI Token Policy:</span>
-                    <span className="text-emerald-500 font-mono">BYOK (Local Browser Only)</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>Firestore Rules:</span>
-                    <span className="text-emerald-500 font-mono">Hardened Rules Active</span>
-                  </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-semibold">Currently Unavailable</h4>
+                  <p className="text-xs opacity-70 max-w-[240px]">
+                    This section is currently unavailable and will be enabled in a future release.
+                  </p>
                 </div>
               </div>
             )}
@@ -273,32 +250,48 @@ export function SettingsModals({
             {activeModal === 'about' && (
               <div className="py-6 flex flex-col items-center justify-center text-center space-y-5">
                 <div className={`w-16 h-16 rounded-3xl border flex items-center justify-center shadow-lg ${
-                  isDarkMode ? 'bg-white/[0.06] border-white/15' : 'bg-neutral-100 border-neutral-300'
+                  isDarkMode ? 'bg-white/[0.08] border-white/18' : 'bg-white/75 border-white/95'
                 }`}>
                   <NetRunnerLogo className="w-9 h-9" isDark={isDarkMode} />
                 </div>
                 <h4 className="text-lg font-bold tracking-[0.2em]">NETRUNNER</h4>
-                <a
-                  href="https://discord.gg/YKCdUCdGE"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Join NetRunner Discord"
-                  title="Join NetRunner Discord"
-                  className={`w-11 h-11 rounded-full border flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
-                    isDarkMode
-                      ? 'bg-[#5865F2]/15 border-[#5865F2]/35 text-[#7289DA] hover:bg-[#5865F2]/25'
-                      : 'bg-[#5865F2]/10 border-[#5865F2]/30 text-[#5865F2] hover:bg-[#5865F2]/20'
-                  }`}
-                >
-                  <DiscordLogo className="w-5 h-5" />
-                </a>
+                <div className="flex items-center justify-center gap-3.5">
+                  <a
+                    href="https://discord.gg/YKCdUCdGE"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Join NetRunner Discord"
+                    title="Discord"
+                    className={`w-11 h-11 rounded-full border flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
+                      isDarkMode
+                        ? 'bg-[#5865F2]/18 border-[#5865F2]/40 text-[#7289DA] hover:bg-[#5865F2]/28'
+                        : 'bg-[#5865F2]/12 border-[#5865F2]/35 text-[#5865F2] hover:bg-[#5865F2]/22'
+                    }`}
+                  >
+                    <DiscordLogo className="w-5 h-5" />
+                  </a>
+                  <a
+                    href="https://x.com/Netrunnerapp"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Follow NetRunner on X"
+                    title="X (@Netrunnerapp)"
+                    className={`w-11 h-11 rounded-full border flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
+                      isDarkMode
+                        ? 'bg-white/[0.09] border-white/22 text-white hover:bg-white/[0.16]'
+                        : 'bg-neutral-900/8 border-neutral-900/20 text-neutral-900 hover:bg-neutral-900/14'
+                    }`}
+                  >
+                    <XLogo className="w-4 h-4" />
+                  </a>
+                </div>
               </div>
             )}
           </div>
 
           {/* Modal Footer */}
           <div className={`px-6 py-3.5 border-t flex justify-end ${
-            isDarkMode ? 'border-white/10 bg-white/[0.02]' : 'border-neutral-100 bg-neutral-50'
+            isDarkMode ? 'border-white/10 bg-white/[0.02]' : 'border-black/5 bg-white/25'
           }`}>
             <button
               onClick={onClose}
@@ -310,7 +303,7 @@ export function SettingsModals({
             </button>
           </div>
         </motion.div>
-      </div>
+      </motion.div>
     </AnimatePresence>
   );
 }
